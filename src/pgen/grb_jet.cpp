@@ -245,7 +245,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku + 1; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        b.x3f(k, j, (il - i)) = 0;
+                        b.x3f(k, j, (il - i)) = 0.0;
                     }
                 }
             }
@@ -254,11 +254,11 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                    prim(IDN, k, j, il - i) = 0;
+                    prim(IVX, k, j, il - i) = 0;
+                    prim(IVY, k, j, il - i) = 0;
+                    prim(IVZ, k, j, il - i) = 0;
+                    prim(IPR, k, j, il - i) = 0;
                 }
             }
         }
@@ -299,11 +299,11 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                         prim(IVZ, k, j, il - i) = v_jet_phi * pcoord->x2v(j) / theta_jet;
                         prim(IPR, k, j, il - i) = p_jet;
                     } else {
-                        prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                        prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
-                        prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                        prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                        prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                        prim(IDN, k, j, il - i) = 0;
+                        prim(IVX, k, j, il - i) = 0;
+                        prim(IVY, k, j, il - i) = 0;
+                        prim(IVZ, k, j, il - i) = 0;
+                        prim(IPR, k, j, il - i) = 0;
                     }
                 }
             }
