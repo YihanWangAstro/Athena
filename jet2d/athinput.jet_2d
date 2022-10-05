@@ -1,7 +1,7 @@
 <comment>
 problem   = spherical MHD blast wave in spherical coordinates
 reference = Gardiner. T.A. & Stone, J.M., JCP, 205, 509 (2005) (for MHD version of test)
-configure = --prob=grb_jet --coord=spherical_polar -s -b -hdf5
+configure = --prob=grb_jet --coord=spherical_polar -s -b -hdf5 -omp
 
 <job>
 problem_id = Jet      # problem ID: basename of output filenames
@@ -14,20 +14,20 @@ dt         = 1e-3 # time increment between outputs
 <time>
 cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 1       # time limit
+tlim       = 2       # time limit
 integrator  = vl2       # time integration algorithm
 xorder      = 2         # order of spatial reconstruction
-ncycle_out  = 1         # interval for stdout summary info
+ncycle_out  = 10         # interval for stdout summary info
 
 <mesh>
-nx1        = 240        # Number of zones in X1-direction
+nx1        = 2400        # Number of zones in X1-direction
 x1min      = 1.66666666e-3        # minimum value of X1
 x1max      = 2        # maximum value of X1
 ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
-x1rat      = 1.0299826802570349
+x1rat      = 1.003071349187579
 
-nx2        = 64                      # Number of zones in X2-direction
+nx2        = 512                      # Number of zones in X2-direction
 x2min      = 0                        # minimum value of X2
 x2max      = 3.1415926535897931e+00   # maximum value of X2
 ix2_bc     = polar_wedge              # inner-X2 boundary flag
@@ -36,22 +36,24 @@ ox2_bc     = polar_wedge              # outer-X2 boundary flag
 nx3        = 1             # Number of zones in X3-direction
 x3min      = -0.01         # minimum value of X3
 x3max      =  0.01         # maximum value of X3
-ix3_bc     = outflow        # inner-X3 boundary flag
-ox3_bc     = outflow       # outer-X3 boundary flag 
+ix3_bc     = periodic        # inner-X3 boundary flag
+ox3_bc     = periodic       # outer-X3 boundary flag 
 
-num_threads = 12
+num_threads = 96
 
 <meshblock>
-nx1 = 6
-nx2 = 2
+nx1 = 12
+nx2 = 8
 nx3 = 1
 
 <hydro>
-gamma          = 1.3333333333333333333  # gamma = C_p/C_v
+gamma       = 1.3333333333333333333  # gamma = C_p/C_v
+dfloor = 1.35e-5 
+pfloor = 2e-10
 
 <problem>
-pamb    = 0.00001             # ambient pressure
-rho_amb = 1        
+pamb    = 2e-10         # ambient pressure
+rho_amb = 1.35e-5        # 1g/cm^3
 
 r_in = 1.6666666666e-3
 M_ej = 0.01
@@ -59,7 +61,7 @@ M_ej = 0.01
 v_ej = 0.2
 t_ej_duration = 0.015
 t_ej_crit = 0.005
-p_ej = 0.1
+p_ej = 100
 
 
 theta_jet = 0.17453292519943295
@@ -67,8 +69,16 @@ t_jet_launch = 0.02
 v_jet_r = 0.8
 v_jet_phi = 0.4
 Gamma_inf = 265
-L_jet = 1
+L_jet = 0.00278
 
-B_r = 1
-B_phi = 2
+B_r = 11.6
+B_phi = 23.2
 
+#CODE UNITS
+#length = 3e10 cm
+#mass = 1.989e33 g
+#time = 1 sec
+#pressure = 1.5e-23 barye M/L/T^2
+#density = 0.135 g/cm^3 M/L^3
+#magnetic field =  3.872983346207417e-12 G (M/L)^0.5/T
+#luminosity = 5.5555555e-55 erg/s ML^2/T^3
