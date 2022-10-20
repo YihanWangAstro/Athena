@@ -73,6 +73,7 @@ Real v_jet_phi = 0.0;
 Real u_jet = 0.0;
 
 Real t_jet_launch = 0;
+Real t_jet_duration = 0;
 
 Real rho_ej = 0;
 Real rho_jet = 0;
@@ -103,7 +104,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
     t_jet_launch = pin->GetOrAddReal("problem", "t_jet_launch", 0.05);
-
+    t_jet_duration = pin->GetOrAddReal("problem", "t_jet_duration", 1);
     v_jet_r = pin->GetOrAddReal("problem", "v_jet_r", 0.8);
     v_jet_phi = pin->GetOrAddReal("problem", "v_jet_phi", 0.4);
     gamma_jet = 1 / std::sqrt(1 - v_jet_r * v_jet_r - v_jet_phi * v_jet_phi);
@@ -186,7 +187,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         std::cout << "use sphereical coordinate" << std::endl;
         exit(0);
     }
-
+    Real rc = 0.043333;
     if (time < t_ej_crit) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
@@ -194,6 +195,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
                     prim(IVX, k, j, il - i) = gamma_ej * v_ej;
+                    ;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = p_ej;
@@ -205,6 +207,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             SET_MAGNETIC_FIELD_BC_ZERO
         }
     } else if (time < t_ej_end) {
+        Real vel = v_ej * (1.5 - time / t_ej_crit / 2);
+        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
@@ -212,7 +216,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IDN, k, j, il - i) =
                         rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
 
-                    prim(IVX, k, j, il - i) = gamma_ej * v_ej;
+                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = p_ej;
@@ -226,11 +230,12 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                    Real sin_theta = std::sin(pcoord->x2v(j));
+                    prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) / 9;
+                    prim(IVX, k, j, il - i) = 0;
+                    prim(IVY, k, j, il - i) = 0;
+                    prim(IVZ, k, j, il - i) = 0;
+                    prim(IPR, k, j, il - i) = p_ej;
                 }
             }
         }
@@ -240,7 +245,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         }
     }
 
-    if (time >= t_jet_launch) {
+    if ((time >= t_jet_launch + t_ej_end )&& (time < t_jet_launch + t_ej_end + t_jet_duration)) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {

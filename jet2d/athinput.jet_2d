@@ -20,14 +20,14 @@ xorder      = 2         # order of spatial reconstruction
 ncycle_out  = 10         # interval for stdout summary info
 
 <mesh>
-nx1        = 2400        # Number of zones in X1-direction
+nx1        = 120        # Number of zones in X1-direction
 x1min      = 1.66666666e-3        # minimum value of X1
 x1max      = 2        # maximum value of X1
 ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
 x1rat      = 1.003071349187579
 
-nx2        = 512                      # Number of zones in X2-direction
+nx2        = 128                      # Number of zones in X2-direction
 x2min      = 0                        # minimum value of X2
 x2max      = 3.1415926535897931e+00   # maximum value of X2
 ix2_bc     = polar_wedge              # inner-X2 boundary flag
@@ -39,11 +39,11 @@ x3max      =  0.01         # maximum value of X3
 ix3_bc     = periodic        # inner-X3 boundary flag
 ox3_bc     = periodic       # outer-X3 boundary flag 
 
-num_threads = 96
+num_threads = 12
 
 <meshblock>
-nx1 = 12
-nx2 = 8
+nx1 = 6
+nx2 = 2
 nx3 = 1
 
 <hydro>
@@ -65,7 +65,8 @@ p_ej = 100
 
 
 theta_jet = 0.17453292519943295
-t_jet_launch = 0.02
+t_jet_launch = 0.01
+t_jet_duration = 1
 v_jet_r = 0.8
 v_jet_phi = 0.4
 Gamma_inf = 265
