@@ -418,6 +418,8 @@ namespace {
         Real pgas_min = std::cbrt(27.0 / 4.0 * d) - ee - 0.5 * bb_sq;
         pgas_min = std::max(pgas_min, pgas_uniform_min);
 
+        // std::cout << "call" << dd << ' ' << ee << ' ' << bb_sq << std::endl;
+
         // Iterate until convergence
         Real pgas[3];
         pgas[0] = std::max(pgas_old, pgas_min);
@@ -429,7 +431,7 @@ namespace {
                 a = ee + pgas[n % 3] + 0.5 * bb_sq;  // (NH 5.7)
                 a = std::max(a, a_min);
             }
-
+            //  std::cout << "!!!" << ee << ' ' << bb_sq << '\n';
             // Step 2: Calculate correct root of cubic equation
             Real phi, eee, ll, v_sq;
             if (n % 3 != 2) {
@@ -448,6 +450,7 @@ namespace {
 
             // Step 3: Check for convergence
             if (n % 3 != 2) {
+                // std::cout << n << ' ' << pgas[(n + 1) % 3] << ' ' << pgas[n % 3] << ' ' << pgas_min << '\n';
                 if (pgas[(n + 1) % 3] > pgas_min && std::abs(pgas[(n + 1) % 3] - pgas[n % 3]) < tol) {
                     break;
                 }
@@ -461,6 +464,8 @@ namespace {
                 }
                 pgas[0] = pgas[1] + (pgas[2] - pgas[1]) / (1.0 - rr);  // (NH 7.2)
                 pgas[0] = std::max(pgas[0], pgas_min);
+
+                // std::cout << n << ' ' << pgas[2] << ' ' << pgas[0] << ' ' << pgas_min << '\n';
                 if (pgas[0] > pgas_min && std::abs(pgas[0] - pgas[2]) < tol) {
                     break;
                 }
@@ -501,6 +506,8 @@ namespace {
         }
         *p_gamma_lor = gamma;
         *p_pmag = 0.5 * (bb_sq / gamma_sq + SQR(ss));  // (NH 3.7, 3.11)
+        // std::cout << "SUCCESS" << prim(IDN, k, j, i) << std::endl;
+        // exit(0);
         return true;
     }
 
