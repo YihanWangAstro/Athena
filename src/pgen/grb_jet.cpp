@@ -119,6 +119,10 @@ Real Gamma = 1.333333333333333333;
 
 Real K_EFF = 4.76E-7;
 
+size_t data_size = 1000;
+std::vector<Real> THETA;
+std::vector<Real> P;
+
 Real sigmod(Real x, Real x0, Real width) { return 1 / (1 + std::exp((x - x0) / width)); }
 
 Real ave_coef_b2_phi(Real alpha) {
@@ -162,10 +166,6 @@ Real dpdtheta(Real theta, Real rho, Real p_now, Real Br, Real Bjm, Real vr, Real
            (Br * vphi - vr * Bphi) * Br * dvdtheta_ + rho * h * g * g * vphi * vphi / theta +
            Br * vphi / theta * (Br * vphi - 2 * Bphi * vr);
 }
-size_t data_size = 1000;
-std::vector<Real> THETA;
-std::vector<Real> P;
-bool profile_calculated = false;
 
 void calc_p_jet_profile(Real rho, Real Br, Real Bjm, Real vr, Real vjm, Real pa, Real alpha, Real theta_j) {
     Real Bphi1 = get_Bphi(theta_j, Bjm, theta_j, alpha);
@@ -336,6 +336,25 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             }
         }
     }
+
+    calc_p_jet_profile(rho_jet, B_r, B_phi, v_jet_r, v_jet_m, p_amb, Alpha, theta_jet);
+
+    bool p_positive = check_p(P);
+    if (p_positive == false) {
+        std::cout << "p is negative" << std::endl;
+        exit(0);
+    }
+
+    Real p_ave_real = calc_p_ave(THETA, P);
+    Real hh = 1 + 4 * p_ave_real / rho_jet;
+    Real sigma_r = B_r * B_r / 2 / p_ave_real;
+    Real sigma_phi = ave_coef_b2_phi(Alpha) * B_phi * B_phi / 2 / p_ave_real / gamma_jet_r / gamma_jet_r;
+    std::cout << "launching jet at t = " << time << std::endl;
+    std::cout << "p_ave = " << p_ave_real << std::endl;
+    std::cout << "h = " << hh << std::endl;
+    std::cout << "sigma_r = " << sigma_r << std::endl;
+    std::cout << "sigma_phi = " << sigma_phi << std::endl;
+    std::cout << "h* = " << hh + 0.5 * (hh - 1) * (sigma_phi + sigma_r) << std::endl;
 }
 
 size_t get_boundary_index(Coordinates *pcoord, size_t jl, size_t ju, Real theta_jet) {
@@ -448,30 +467,6 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     }
                 }
             }
-        }
-        if (profile_calculated == false) {
-            size_t bd_index = get_boundary_index(pcoord, jl, ju, theta_jet);
-            calc_p_jet_profile(rho_jet, B_r, B_phi, v_jet_r, v_jet_m, prim(IPR, kl, bd_index, il - 1), Alpha,
-                               theta_jet);
-
-            bool p_positive = check_p(P);
-            if (p_positive == false) {
-                std::cout << "p is negative" << std::endl;
-                exit(0);
-            }
-
-            Real p_ave_real = calc_p_ave(THETA, P);
-            Real hh = 1 + 4 * p_ave_real / rho_jet;
-            Real sigma_r = B_r * B_r / 2 / p_ave_real;
-            Real sigma_phi = ave_coef_b2_phi(Alpha) * B_phi * B_phi / 2 / p_ave_real / gamma_jet_r / gamma_jet_r;
-            std::cout << "launching jet at t = " << time << std::endl;
-            std::cout << "p_ave = " << p_ave_real << std::endl;
-            std::cout << "rho_a = " << prim(IDN, kl, bd_index, il - 1) << std::endl;
-            std::cout << "h = " << hh << std::endl;
-            std::cout << "sigma_r = " << sigma_r << std::endl;
-            std::cout << "sigma_phi = " << sigma_phi << std::endl;
-            std::cout << "h* = " << hh + 0.5 * (hh - 1) * (sigma_phi + sigma_r) << std::endl;
-            profile_calculated = true;
         }
 
         for (int k = kl; k <= ku; ++k) {

@@ -54,7 +54,7 @@ pfloor = 1e-17
 gamma_max=1000
 
 <problem>   
-k_eff = 4.66e-5
+k_eff = 4.66e-7
 rho_amb = 1.35e-4 
 
 M_ej = 0.01
