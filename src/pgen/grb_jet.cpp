@@ -170,7 +170,8 @@ bool profile_calculated = false;
 void calc_p_jet_profile(Real rho, Real Br, Real Bjm, Real vr, Real vjm, Real pa, Real alpha, Real theta_j) {
     Real Bphi1 = get_Bphi(theta_j, Bjm, theta_j, alpha);
     Real vphi1 = get_vphi(theta_j, vjm, theta_j);
-    Real p1 = calc_p_b(Br, Bphi1, vr, vphi1) + pa;
+    Real p1 = pa;
+    //  -calc_p_b(Br, Bphi1, vr, vphi1);
 
     THETA.resize(data_size + 1);
     P.resize(data_size + 1);
@@ -186,8 +187,9 @@ void calc_p_jet_profile(Real rho, Real Br, Real Bjm, Real vr, Real vjm, Real pa,
     Real dtheta = THETA[1] - THETA[0];
     for (int i = data_size - 1; i >= 0; i--) {
         P[i] = P[i + 1] - dpdtheta(THETA[i + 1], rho, P[i + 1], Br, Bjm, vr, vjm, alpha, theta_j) * dtheta;
+        if (P[i] < 0) P[i] = 0;
     }
-    for (size_t i = 0; i < P.size(); i++) {
+    for (size_t i = 0; i < P.size(); i += 10) {
         std::cout << "theta = " << THETA[i] << ", p = " << P[i] << std::endl;
     }
 }
@@ -242,7 +244,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_ej_end = pin->GetOrAddReal("problem", "t_ej_duration", 0.015);
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
 
-    Real int_coef = 2 * PI * (2 * t_ej_crit - t_ej_crit * t_ej_crit / t_ej_end) * (0.5 + 3.0 / 8 * PI);
+    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * t_ej_crit;  // (2 * t_ej_crit - t_ej_crit * t_ej_crit / t_ej_end);
     rho_ej = M_ej / (v_ej * rin * rin * int_coef);
 
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
@@ -352,12 +354,17 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         exit(0);
     }
     if (time < t_ej_crit) {
+        // Real tau = (rin / 0.04333) * t_ej_crit / (1 - rin / 0.043333);
+        // Real vel = v_ej * tau / (time + tau);
+        // Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+        Real vel = v_ej;
+        Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
-                    prim(IVX, k, j, il - i) = gamma_ej * v_ej;
+                    prim(IVX, k, j, il - i) = gamma_ej * vel;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
@@ -371,14 +378,15 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
     } else if (time <= t_ej_end) {
         const Real tau = rin / v_ej;
         Real vel = v_ej * tau / (time + tau);
-        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+        Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     prim(IDN, k, j, il - i) =
                         rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
-                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                    // prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                    prim(IVX, k, j, il - i) = gamma_ej * v_ej;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
@@ -458,7 +466,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             Real sigma_phi = ave_coef_b2_phi(Alpha) * B_phi * B_phi / 2 / p_ave_real / gamma_jet_r / gamma_jet_r;
             std::cout << "launching jet at t = " << time << std::endl;
             std::cout << "p_ave = " << p_ave_real << std::endl;
-
+            std::cout << "rho_a = " << prim(IDN, kl, bd_index, il - 1) << std::endl;
             std::cout << "h = " << hh << std::endl;
             std::cout << "sigma_r = " << sigma_r << std::endl;
             std::cout << "sigma_phi = " << sigma_phi << std::endl;

@@ -1,7 +1,7 @@
 <comment>
 problem   = spherical MHD blast wave in spherical coordinates
 reference = Gardiner. T.A. & Stone, J.M., JCP, 205, 509 (2005) (for MHD version of test)
-configure = --prob=grb_jet --coord=spherical_polar -s -b -hdf5 -omp
+configure = --prob=grb_jet_old --coord=spherical_polar -s -b -hdf5 -omp
 
 <job>
 problem_id = Jet      # problem ID: basename of output filenames
@@ -49,20 +49,18 @@ ox3_bc     = periodic        # outer-X3 boundary flag
 
 <hydro>
 gamma  = 1.3333333333333333333  # gamma = C_p/C_v
-dfloor = 1e-8
+dfloor = 1e-5
 pfloor = 1e-17
 gamma_max=1000
 
 <problem>   
-k_eff = 4.47e-7
-rho_amb = 1.35e-6 
-#p_amb = 1e-10
+k_eff = 4.66e-5
+rho_amb = 1.35e-4 
 
 M_ej = 0.01
 t_ej_crit = 0.005
 t_ej_end = 0.015
 v_ej = 0.2
-#p_ej = 17.1
 
 theta_jet = 0.17453292519943295
 t_jet_launch = 0.01
