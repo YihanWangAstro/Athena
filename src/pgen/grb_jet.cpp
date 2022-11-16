@@ -372,18 +372,19 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         std::cout << "use sphereical coordinate" << std::endl;
         exit(0);
     }
+    /*const Real rr = (rin / 0.04333);
+    const Real tau = rr * t_ej_crit / (1 - rr);
     if (time < t_ej_crit) {
-        // Real tau = (rin / 0.04333) * t_ej_crit / (1 - rin / 0.043333);
         // Real vel = v_ej * tau / (time + tau);
         // Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
-        Real vel = v_ej;
-        Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
+        Real vel = v_ej * tau / (time + tau);
+        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
-                    prim(IVX, k, j, il - i) = gamma_ej * vel;
+                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
@@ -395,23 +396,44 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
     } else if (time <= t_ej_end) {
-        const Real tau = rin / v_ej;
-        Real vel = v_ej * tau / (time + tau);
-        Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
+        Real vel = v_ej * tau / (t_ej_crit + tau);
+        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     prim(IDN, k, j, il - i) =
                         rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
-                    // prim(IVX, k, j, il - i) = gamma_ej_t * vel;
-                    prim(IVX, k, j, il - i) = gamma_ej * v_ej;
+                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                    // prim(IVX, k, j, il - i) = gamma_ej * v_ej;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
                 }
             }
         }
+        if (MAGNETIC_FIELDS_ENABLED) {
+            SET_MAGNETIC_FIELD_BC_OUTFLOW
+        }
+    }*/
+    const Real rr = (rin / 0.04333);
+    const Real tau = rr * t_ej_end / (1 - rr);
+    if (time < t_ej_end) {
+        Real vel = v_ej * tau / (time + tau);
+        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    Real sin_theta = std::sin(pcoord->x2v(j));
+                    prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
+                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                    prim(IVY, k, j, il - i) = 0.0;
+                    prim(IVZ, k, j, il - i) = 0.0;
+                    prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
+                }
+            }
+        }
+
         if (MAGNETIC_FIELDS_ENABLED) {
             SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
