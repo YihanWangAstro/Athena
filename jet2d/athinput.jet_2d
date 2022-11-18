@@ -8,7 +8,7 @@ problem_id = Jet      # problem ID: basename of output filenames
 
 <output1>
 file_type  = hdf5        # Binary data dump
-variable   = prim       # variables to be output
+variable   = prim, cons       # variables to be output
 dt         = 5e-3  # time increment between outputs
 
 <time>
@@ -22,7 +22,7 @@ ncycle_out  = 30         # interval for stdout summary info
 <mesh>
 nx1        = 240       # Number of zones in X1-direction
 x1min      = 1.66666666e-3        # minimum value of X1
-x1max      = 0.1        # maximum value of X1
+x1max      = 0.3        # maximum value of X1
 ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
 x1rat      = 1.01
@@ -49,12 +49,12 @@ ox3_bc     = periodic        # outer-X3 boundary flag
 
 <hydro>
 gamma  = 1.3333333333333333333  # gamma = C_p/C_v
-dfloor = 1e-5
+dfloor = 1e-6
 pfloor = 1e-17
 gamma_max=1000
 
 <problem>   
-k_eff = 4.66e-7
+k_eff = 4.66e-5
 rho_amb = 1.35e-4 
 
 M_ej = 0.01
@@ -67,9 +67,10 @@ t_jet_launch = 0.01
 t_jet_duration = 1
 v_jet_r = 0.8
 v_jet_phi = 0.5
-Gamma_inf = 365
-L_jet = 0.00278
-B_r =  3.388
+Gamma_inf = 300
+L_jet = 0.0010
+8 #0.00278
+B_r =  0 # 3.388
 B_phi = 6.777
 
 t_wind_launch = 1.5

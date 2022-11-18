@@ -170,8 +170,7 @@ Real dpdtheta(Real theta, Real rho, Real p_now, Real Br, Real Bjm, Real vr, Real
 void calc_p_jet_profile(Real rho, Real Br, Real Bjm, Real vr, Real vjm, Real pa, Real alpha, Real theta_j) {
     Real Bphi1 = get_Bphi(theta_j, Bjm, theta_j, alpha);
     Real vphi1 = get_vphi(theta_j, vjm, theta_j);
-    Real p1 = pa;
-    //  -calc_p_b(Br, Bphi1, vr, vphi1);
+    Real p1 = pa - calc_p_b(Br, Bphi1, vr, vphi1);
 
     THETA.resize(data_size + 1);
     P.resize(data_size + 1);
@@ -262,8 +261,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     B_r = pin->GetOrAddReal("problem", "B_r", 11.6);
     B_phi = pin->GetOrAddReal("problem", "B_phi", 23.2);
-    Real b2 = B_r * B_r + B_phi * B_phi * ave_coef_b2_phi(Alpha) / gamma_jet_r / gamma_jet_r;
-
+    // Real b2 = B_r * B_r + B_phi * B_phi * ave_coef_b2_phi(Alpha) / gamma_jet_r / gamma_jet_r;
+    Real b2_r = (B_r * B_r + ave_coef_b2_phi(Alpha) * B_phi * B_phi) / gamma_jet_r / gamma_jet_r +
+                (v_jet_r * B_r + ave_coef_b2_phi(Alpha) * B_phi * v_jet_m) *
+                    (v_jet_r * B_r + ave_coef_b2_phi(Alpha) * B_phi * v_jet_m);
+    Real pm = b2_r / 2;
     Real h_star = Gamma_inf / gamma_jet_r;
 
     rho_jet = e_jet / gamma_jet_r / gamma_jet_r / h_star;
@@ -291,6 +293,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     return;
 }
 
+Real calc_jet_rho(Real e, Real Gamma, Real b2, Real vB, Real sigma){
+    
+}
 //========================================================================================
 //! \fn void MeshBlock::ProblemGenerator(ParameterInput *pin)
 //! \brief Spherical blast wave test problem generator
@@ -336,8 +341,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             }
         }
     }
-
-    calc_p_jet_profile(rho_jet, B_r, B_phi, v_jet_r, v_jet_m, p_amb, Alpha, theta_jet);
+    Real p_a = K_EFF * rho_ej * (0.25 + sin(theta_jet) * sin(theta_jet) * sin(theta_jet));
+    calc_p_jet_profile(rho_jet, B_r, B_phi, v_jet_r, v_jet_m, p_a, Alpha, theta_jet);
 
     bool p_positive = check_p(P);
     if (p_positive == false) {
@@ -374,48 +379,49 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
     }
     /*const Real rr = (rin / 0.04333);
     const Real tau = rr * t_ej_crit / (1 - rr);
-    if (time < t_ej_crit) {
-        // Real vel = v_ej * tau / (time + tau);
-        // Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
-        Real vel = v_ej * tau / (time + tau);
-        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    Real sin_theta = std::sin(pcoord->x2v(j));
-                    prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
-                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
-                    prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
-                }
-            }
-        }
+     if (time < t_ej_crit) {
+         // Real vel = v_ej * tau / (time + tau);
+         // Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+         Real vel = v_ej;
+         //*tau / (time + tau);
+         Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+         for (int k = kl; k <= ku; ++k) {
+             for (int j = jl; j <= ju; ++j) {
+                 for (int i = 1; i <= ngh; ++i) {
+                     Real sin_theta = std::sin(pcoord->x2v(j));
+                     prim(IDN, k, j, il - i) = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
+                     prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                     prim(IVY, k, j, il - i) = 0.0;
+                     prim(IVZ, k, j, il - i) = 0.0;
+                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
+                 }
+             }
+         }
 
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
-    } else if (time <= t_ej_end) {
-        Real vel = v_ej * tau / (t_ej_crit + tau);
-        Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    Real sin_theta = std::sin(pcoord->x2v(j));
-                    prim(IDN, k, j, il - i) =
-                        rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
-                    prim(IVX, k, j, il - i) = gamma_ej_t * vel;
-                    // prim(IVX, k, j, il - i) = gamma_ej * v_ej;
-                    prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
-    }*/
+         if (MAGNETIC_FIELDS_ENABLED) {
+             SET_MAGNETIC_FIELD_BC_OUTFLOW
+         }
+     } else if (time <= t_ej_end) {
+         Real vel = v_ej * tau / (t_ej_crit + tau);
+         Real gamma_ej_t = 1 / std::sqrt(1 - vel * vel);
+         for (int k = kl; k <= ku; ++k) {
+             for (int j = jl; j <= ju; ++j) {
+                 for (int i = 1; i <= ngh; ++i) {
+                     Real sin_theta = std::sin(pcoord->x2v(j));
+                     prim(IDN, k, j, il - i) =
+                         rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
+                     prim(IVX, k, j, il - i) = gamma_ej_t * vel;
+                     // prim(IVX, k, j, il - i) = gamma_ej * v_ej;
+                     prim(IVY, k, j, il - i) = 0.0;
+                     prim(IVZ, k, j, il - i) = 0.0;
+                     prim(IPR, k, j, il - i) = K_EFF * pow(prim(IDN, k, j, il - i), Gamma);
+                 }
+             }
+         }
+         if (MAGNETIC_FIELDS_ENABLED) {
+             SET_MAGNETIC_FIELD_BC_OUTFLOW
+         }
+     }*/
     const Real rr = (rin / 0.04333);
     const Real tau = rr * t_ej_end / (1 - rr);
     if (time < t_ej_end) {
