@@ -27,7 +27,7 @@ ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
 x1rat      = 1.01
 
-nx2        = 128                 # Number of zones in X2-direction
+nx2        = 256                 # Number of zones in X2-direction
 x2min      = 0                        # minimum value of X2
 x2max      = 1.5707963267948966  # maximum value of X2
 ix2_bc     = polar_wedge             # inner-X2 boundary flag
@@ -49,29 +49,32 @@ ox3_bc     = periodic        # outer-X3 boundary flag
 
 <hydro>
 gamma  = 1.3333333333333333333  # gamma = C_p/C_v
-dfloor = 1e-6
-pfloor = 1e-17
+dfloor = 1e-7
+pfloor = 1e-18
 gamma_max=1000
 
 <problem>   
-k_eff = 4.66e-5
-rho_amb = 1.35e-4 
+injection_ej = 0
 
+THETA_amb = 1e-4 
+rho_amb = 1.35e-5 
+
+THETA_ej = 1e-4
 M_ej = 0.01
 t_ej_crit = 0.005
 t_ej_end = 0.015
 v_ej = 0.2
 
-theta_jet = 0.17453292519943295
+theta_jet = 0.1
 t_jet_launch = 0.01
 t_jet_duration = 1
 v_jet_r = 0.8
-v_jet_phi = 0.5
+v_jet_jm = 0.5
 Gamma_inf = 300
-L_jet = 0.0010
-8 #0.00278
-B_r =  0 # 3.388
-B_phi = 6.777
+L_jet = 0.00278
+B_r =  0 #3.388
+B_jm = 7.070855 #6.777
+#sigma_B = 1
 
 t_wind_launch = 1.5
 Omega = 628
