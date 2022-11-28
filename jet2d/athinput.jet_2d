@@ -55,11 +55,11 @@ gamma_max=1000
 
 <problem>   
 injection_ej = 0
-
-THETA_amb = 1e-4 
+rin = 1.66666666e-3
+THETA_amb = 1e-2 
 rho_amb = 1.35e-5 
 
-THETA_ej = 1e-4
+THETA_ej = 1e-2
 M_ej = 0.01
 t_ej_crit = 0.005
 t_ej_end = 0.015

@@ -200,31 +200,22 @@ bool check_p(std::vector<Real> &p) {
 }
 int is_ej = false;
 
-void Mesh::InitUserMeshData(ParameterInput *pin) {
-    is_ej = pin->GetOrAddReal("problem", "injection_ej", 0);
-    if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
-        if (static_cast<bool>(is_ej)) {
-            EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
-        } else {
-            EnrollUserBoundaryFunction(BoundaryFace::inner_x1, Jet);
-        }
-    }
-    return;
-}
-
 //========================================================================================
 //! \fn void MeshBlock::ProblemGenerator(ParameterInput *pin)
 //! \brief Spherical blast wave test problem generator
 //========================================================================================
 
 Real rin = 0;
-
+Real hydro_coef = 0;
+Real THETA_amb = 0;
+Real rho_amb = 0;
 // ejetcta
 Real t_ej_crit = 0.005;
 Real t_ej_end = 0.015;
 Real v_ej = 0.2;
 Real rho_ej = 0;
 Real THETA_ej = 1e-4;
+Real rc = 0;
 
 // jet
 Real theta_jet = 0.1;
@@ -240,16 +231,17 @@ Real B_jm = 0;
 
 inline void print_par(std::string name, Real value) { std::cout << name << " = " << value << std::endl; }
 
-void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-    rin = pcoord->x1f(is);
+void Mesh::InitUserMeshData(ParameterInput *pin) {
+    is_ej = pin->GetOrAddReal("problem", "injection_ej", 0);
+    rin = pin->GetOrAddReal("problem", "rin", 1.66666666e-3);
 
     // reading hydro paramters
     Real gamma_hydro = pin->GetOrAddReal("hydro", "gamma", 1.33333333);
-    Real hydro_coef = gamma_hydro / (gamma_hydro - 1);
+    hydro_coef = gamma_hydro / (gamma_hydro - 1);
 
     // reading parameters of ambient medium
-    Real THETA_amb = pin->GetOrAddReal("problem", "THETA_amb", 1e-3);
-    Real rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1e-10);
+    THETA_amb = pin->GetOrAddReal("problem", "THETA_amb", 1e-3);
+    rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1e-10);
 
     // reading parameters of ejecta
     THETA_ej = pin->GetOrAddReal("problem", "THETA_ej", 1e-4);
@@ -258,6 +250,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
     t_ej_end = pin->GetOrAddReal("problem", "t_ej_duration", 0.015);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
+    rc = pin->GetOrAddReal("problem", "r_c", 0.0433333333);
 
     // reading parameters of jet
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
@@ -280,7 +273,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
     /// initializing variables
     // ejecta calculations
-    Real rc = 0.043333333;
 
     Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * t_ej_crit;  // (2 * t_ej_crit - t_ej_crit * t_ej_crit / t_ej_end);
     if (static_cast<bool>(is_ej)) {
@@ -316,6 +308,41 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     print_par("p_jet", p_jet_ave);
     print_par("h_star", h_star);
     print_par("gamma_r", gamma_jet_r);
+
+    Real p_a = THETA_ej * rho_ej * (0.25 + sin(theta_jet) * sin(theta_jet) * sin(theta_jet)) * pow(rin / rc, -2);
+    Real v1 = get_vphi(theta_jet, v_jet_jm, theta_jet);
+    Real gamma_jet1 = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v1 * v1);
+    Real B_phi1 = get_Bphi(theta_jet, B_jm, theta_jet, Alpha);
+    Real v_dot_B1 = v_jet_r * B_r + v1 * B_phi1;
+    Real pm_1 = ((B_r * B_r + B_phi1 * B_phi1) / gamma_jet1 / gamma_jet1 + v_dot_B1 * v_dot_B1) / 2;
+    Real p1 = p_a - pm_1;
+    calc_p_jet_profile(rho_jet, B_r, B_jm, v_jet_r, v_jet_jm, p1, Alpha, theta_jet);
+
+    bool p_positive = check_p(P);
+    if (p_positive == false) {
+        std::cout << "p is negative" << std::endl;
+        exit(0);
+    }
+
+    Real p_ave_real = calc_p_ave(THETA, P);
+    Real hh = 1 + 4 * p_ave_real / rho_jet;
+    Real hh_star = hh + b2_ave / rho_jet;
+    print_par("hh", hh);
+    print_par("hh_star", hh_star);
+    print_par("p_ave_real", p_ave_real);
+
+    if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
+        if (static_cast<bool>(is_ej)) {
+            EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
+        } else {
+            EnrollUserBoundaryFunction(BoundaryFace::inner_x1, Jet);
+        }
+    }
+    return;
+}
+
+void MeshBlock::ProblemGenerator(ParameterInput *pin) {
+    // rin = pcoord->x1f(is);
 
     Real p_amb = rho_amb * THETA_amb;
 
@@ -387,28 +414,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             }
         }
     }
-
-    /* Real p_a = THETA_ej * rho_ej * (0.25 + sin(theta_jet) * sin(theta_jet) * sin(theta_jet));
-     Real v1 = get_vphi(theta_jet, v_jet_jm, theta_jet);
-     Real gamma_jet1 = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v1 * v1);
-     Real B_phi1 = get_Bphi(theta_jet, B_jm, theta_jet, Alpha);
-     Real v_dot_B1 = v_jet_r * B_r + v1 * B_phi1;
-     Real pm_1 = ((B_r * B_r + B_phi1 * B_phi1) / gamma_jet1 / gamma_jet1 + v_dot_B1 * v_dot_B1) / 2;
-     Real p1 = p_a - pm_1;
-     calc_p_jet_profile(rho_jet, B_r, B_jm, v_jet_r, v_jet_jm, p_a, Alpha, theta_jet);
-
-     bool p_positive = check_p(P);
-     if (p_positive == false) {
-         std::cout << "p is negative" << std::endl;
-         exit(0);
-     }
-
-     Real p_ave_real = calc_p_ave(THETA, P);
-     Real hh = 1 + 4 * p_ave_real / rho_jet;
-     Real hh_star = hh + b2_ave / rho_jet;
-     print_par("hh", hh);
-     print_par("hh_star", hh_star);
-     print_par("p_ave_real", p_ave_real);*/
 }
 
 size_t get_boundary_index(Coordinates *pcoord, size_t jl, size_t ju, Real theta_jet) {
@@ -475,8 +480,7 @@ void Jet(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, FaceField
                         prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
                         prim(IVY, k, j, il - i) = 0.0;
                         prim(IVZ, k, j, il - i) = gamma_jet * v_phi;
-                        prim(IPR, k, j, il - i) = p_jet_ave;
-                        // get_p_value(THETA, P, pcoord->x2v(j));  // p_jet_ave / (615389) * pow(10.0, p_index);
+                        prim(IPR, k, j, il - i) = get_p_value(THETA, P, pcoord->x2v(j));
                     } else {
                         prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
                         prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
