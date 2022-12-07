@@ -280,8 +280,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real t = t_jet_launch > t_ej_end ? t_ej_end : t_jet_launch;
 
-    Real p_a = 2 * p_jet_ave;
-    // K_ej *pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
+    Real p_a = K_ej * pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
 
     calc_p_jet_profile(rho_jet, B_r, B_jm, v_jet_r, v_jet_jm, p_a, Alpha, theta_jet);
 
