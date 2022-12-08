@@ -123,7 +123,7 @@ namespace jet1 {
 
         Real rhow = rho + 4 * p_now + b2;
         // std::cout << theta << ' ' << Bphi_ << ' ' << vphi_ << ' ' << rho << ' ' << p_now << ' ' << b2 << ' ' << rhow
-        //           << ' ' << dBdtheta_ << ' ' << dvdtheta_ << '\n';
+        //          << ' ' << dBdtheta_ << ' ' << dvdtheta_ << '\n';
         return (rhow * g2 * vphi_ * vphi_ - Bphi_ * Bphi_ / g2) / theta - Bphi_ * dBdtheta_ / g2 -
                (vphi_ * Bphi_) * (Bphi_ * dvdtheta_ + vphi_ * dBdtheta_);
     }
@@ -308,7 +308,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     K_ej = pin->GetOrAddReal("problem", "K_ej", 4e-6);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
-    t_ej_end = pin->GetOrAddReal("problem", "t_ej_duration", 0.015);
+    t_ej_end = pin->GetOrAddReal("problem", "t_ej_end", 0.015);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
 
     // reading parameters of jet
@@ -362,10 +362,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     if (jet_model == 2) {
         Real t = t_jet_launch > t_ej_end ? t_ej_end : t_jet_launch;
-        for (;;) {
+        for (int i = 0; i < 100; i++) {
             Real p_a = K_ej * pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
 
-            if (t_ej_end == 0) {  // no ejecat
+            if (t_ej_end == 0 || std::isinf(rho_ej)) {  // no ejecat
                 p_a = K_amb * pow(rho_amb, gamma_hydro);
             }
 
@@ -398,10 +398,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
         print_par("k_amb", K_amb);
     } else if (jet_model == 1) {
         Real t = t_jet_launch > t_ej_end ? t_ej_end : t_jet_launch;
-        for (;;) {
+        for (int i = 0; i < 100; i++) {
             Real p_a = K_ej * pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
 
-            if (t_ej_end == 0) {  // no ejecat
+            if (t_ej_end == 0 || std::isinf(rho_ej)) {  // no ejecat
                 p_a = K_amb * pow(rho_amb, gamma_hydro);
             }
 
@@ -506,7 +506,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         if (MAGNETIC_FIELDS_ENABLED) {
             SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
-    } else if (time <= t_ej_end) {
+    } else if (time < t_ej_end) {
         Real vel = v_ej * (t_ej_crit * t_ej_crit * t_ej_crit * t_ej_crit) / (time * time * time * time);
         Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
