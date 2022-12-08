@@ -2,10 +2,10 @@
 #
 #SBATCH --job-name=l-m-j-th
 #SBATCH --output=out.txt
-#SBATCH --ntasks-per-node=40
+#SBATCH --ntasks-per-node=96
 #SBATCH --nodes=1
 #SBATCH --time=2-00:00:00
-#SBATCH -p long-40core
+#SBATCH -p long-96core
 
 module load shared
 module load gcc/9.2.0
