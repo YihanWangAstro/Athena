@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+#SBATCH --job-name=l-h-e-1
+#SBATCH --output=out.txt
+#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=1
+#SBATCH --time=12:00:00
+#SBATCH -p medium-40core
+
+module load shared
+module load gcc/9.2.0
+
+./athena -i input_gen.jet_2d

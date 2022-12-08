@@ -24,14 +24,14 @@ xorder      = 2         # order of spatial reconstruction
 ncycle_out  = 30         # interval for stdout summary info
 
 <mesh>
-nx1        = 256       # Number of zones in X1-direction
+nx1        = 1156       # Number of zones in X1-direction
 x1min      = 1.66666666e-3        # minimum value of X1
 x1max      = 2       # maximum value of X1
 ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
-x1rat      = 1.0281943839174645
+x1rat      = 1.006157477931958
 
-nx2        = 128                 # Number of zones in X2-direction
+nx2        = 256                 # Number of zones in X2-direction
 x2min      = 0                        # minimum value of X2
 x2max      = 1.5707963267948966  # maximum value of X2
 ix2_bc     = polar_wedge             # inner-X2 boundary flag
@@ -65,6 +65,7 @@ rho_amb = 1.35e-3
 
 K_ej = 4e-6
 M_ej = 0.01
+t_ej_crit = 0.005
 t_ej_crit = 0.005
 t_ej_end = 0.015
 v_ej = 0.2
