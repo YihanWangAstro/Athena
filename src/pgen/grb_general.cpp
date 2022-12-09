@@ -362,8 +362,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("w", w);
     print_par("eta", eta);
     print_par("p_amb", p_amb);
-    print_par("p_ej_crit", p_ej);
-    print_par("eta_ej", p_ej / rho_ej + 1);
+    print_par("p_ej_crit", rho_ej * (eta_ej - 1));
+    print_par("eta_ej", eta_ej);
 
     if (jet_model == 2) {
         Real p_a = p_jet;
