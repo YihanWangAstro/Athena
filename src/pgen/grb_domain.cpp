@@ -272,15 +272,13 @@ Real rho_amb = 1.35e-3;
 Real gamma_hydro = 1.33333333333333333;
 
 // ejetcta
-Real t_ej_crit = 0.005;
-Real t_ej_end = 0.015;
 Real v_ej = 0.2;
 Real rho_ej = 0;
 Real K_ej = 1e-6;
+Real r_c = 0.04333333;
 
 // jet
 Real theta_jet = 0.1;
-Real t_jet_launch = 0.5;
 Real t_jet_duration = 1;
 Real v_jet_r = 0.8;
 Real v_jet_jm = 0.4;
@@ -309,13 +307,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // reading parameters of ejecta
     K_ej = pin->GetOrAddReal("problem", "K_ej", 4e-6);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
-    t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
-    t_ej_end = pin->GetOrAddReal("problem", "t_ej_end", 0.015);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
+    r_c = pin->GetOrAddReal("problem", "r_c", 0.043333);
 
     // reading parameters of jet
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
-    t_jet_launch = pin->GetOrAddReal("problem", "t_jet_launch", 0.01);
     t_jet_duration = pin->GetOrAddReal("problem", "t_jet_duration", 1);
     v_jet_r = pin->GetOrAddReal("problem", "v_jet_r", 0.8);
     v_jet_jm = pin->GetOrAddReal("problem", "v_jet_jm", 0.4);
@@ -334,8 +330,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     /// initializing variables
     // ejecta calculations
-    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * (2 * t_ej_crit - t_ej_crit * t_ej_crit / t_ej_end);
-    rho_ej = M_ej / (v_ej * rin * rin * int_coef);
+
+    rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
 
     // jet calculations
 
@@ -423,11 +419,30 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
-                phydro->u(IDN, k, j, i) = rho_amb;
-                phydro->u(IM1, k, j, i) = 0.0;
+                Real r = pcoord->x1f(i);
+                Real sin_theta = std::sin(pcoord->x2v(j));
+                Real v = 0;
+                Real rho = 0;
+                Real p = 0;
+                if (r < r_c) {
+                    rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
+                    v = v_ej * r / r_c;
+                    p = K_ej * pow(rho, gamma_hydro);
+                } else if (r < 4 * r_c) {
+                    rho = rho_ej * 0.25 * pow(r / r_c, -6);
+                    v = v_ej * r / r_c;
+                    p = K_ej * pow(rho, gamma_hydro);
+                } else {
+                    rho = rho_amb;
+                    v = 0;
+                    p = p_amb;
+                }
+                Real g = 1.0 / sqrt(1 - v * v);
+                phydro->u(IDN, k, j, i) = g * rho;
+                phydro->u(IM1, k, j, i) = g * g * (rho + hydro_coef * p) * v;
                 phydro->u(IM2, k, j, i) = 0.0;
                 phydro->u(IM3, k, j, i) = 0.0;
-                phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb) - p_amb;
+                phydro->u(IEN, k, j, i) = g * g * (rho + hydro_coef * p) - p;
             }
         }
     }
@@ -464,63 +479,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         exit(0);
     }
 
-    if (time < t_ej_crit) {
-        Real gamma_ej = 1 / std::sqrt(1 - v_ej * v_ej);
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    Real sin_theta = std::sin(pcoord->x2v(j));
-                    Real rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta);
-                    prim(IDN, k, j, il - i) = rho;
-                    prim(IVX, k, j, il - i) = gamma_ej * v_ej;
-                    prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = K_ej * pow(rho, gamma_hydro);
-                }
-            }
-        }
-
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
-    } else if (time < t_ej_end) {
-        Real vel = v_ej * (t_ej_crit * t_ej_crit * t_ej_crit * t_ej_crit) / (time * time * time * time);
-        Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    Real sin_theta = std::sin(pcoord->x2v(j));
-                    Real rho =
-                        rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * t_ej_crit * t_ej_crit / time / time;
-                    prim(IDN, k, j, il - i) = rho;
-                    prim(IVX, k, j, il - i) = gamma_ej * vel;
-                    prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = K_ej * pow(rho, gamma_hydro);
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
-    } else {
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
-    }
-
-    if ((time >= t_jet_launch) && (time < t_jet_launch + t_jet_duration)) {
+    if (time < t_jet_duration) {
         // std::cout << "jet launch t= " << time << "\n";
         if (MAGNETIC_FIELDS_ENABLED) {
             for (int k = kl; k <= ku; ++k) {
@@ -603,7 +562,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                             prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
                             prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
                         }
-                    } else if (time > t_ej_end) {
+                    } else {
                         prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
                         prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
                         prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
@@ -613,7 +572,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
         }
-    } else if (time >= t_jet_launch + t_jet_duration) {
+    } else {
         // std::cout << "jet end t= " << time << "\n";
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
