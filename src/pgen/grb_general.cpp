@@ -276,7 +276,7 @@ Real t_ej_crit = 0.005;
 Real t_ej_end = 0.015;
 Real v_ej = 0.2;
 Real rho_ej = 0;
-Real p_ej = 10;
+Real eta_ej = 1.01;
 
 // jet
 Real theta_jet = 0.1;
@@ -307,7 +307,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1.35e-6);
 
     // reading parameters of ejecta
-    p_ej = pin->GetOrAddReal("problem", "p_ej", 10);
+    eta_ej = pin->GetOrAddReal("problem", "eta_ej", 1.01);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
     t_ej_end = pin->GetOrAddReal("problem", "t_ej_end", 0.015);
@@ -475,7 +475,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVX, k, j, il - i) = gamma_ej * v_ej;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = p_ej;
+                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1);
                 }
             }
         }
@@ -496,7 +496,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVX, k, j, il - i) = gamma_ej * vel;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = p_ej;
+                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1);
                 }
             }
         }
