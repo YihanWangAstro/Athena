@@ -274,8 +274,10 @@ Real gamma_hydro = 1.33333333333333333;
 // ejetcta
 Real v_ej = 0.2;
 Real rho_ej = 0;
+Real rho_tail = 0;
 Real K_ej = 1e-6;
 Real r_c = 0.04333333;
+Real tail_n = 8;
 
 // jet
 Real theta_jet = 0.1;
@@ -332,6 +334,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
+    rho_tail = 0.01 * M_ej / (4 * PI * r_c * r_c * r_c * (pow(4, 3 - tail_n) - 1) / (3 - tail_n));
 
     // jet calculations
 
@@ -353,6 +356,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     print_par("rho_ej", rho_ej);
     print_par("rho_jet", rho_jet);
+    print_par("rho_tail", rho_tail);
     print_par("sigma", sigma);
     print_par("p_jet", p_jet);
     print_par("w", w);
@@ -429,7 +433,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     v = v_ej * r / r_c;
                     p = K_ej * pow(rho, gamma_hydro);
                 } else if (r < 4 * r_c) {
-                    rho = rho_ej * 0.25 * pow(r / r_c, -6);
+                    rho = rho_tail * pow(r / r_c, -8);
                     v = v_ej * r / r_c;
                     p = K_ej * pow(rho, gamma_hydro);
                 } else {
