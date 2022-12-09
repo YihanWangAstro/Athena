@@ -132,7 +132,8 @@ namespace jet1 {
         Real Bphi1 = Bphi(theta_j, Bjm, theta_j);
         Real vphi1 = vphi(theta_j, vjm, theta_j);
         Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
-        Real p1 = pa - (Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
+        Real p1 = pa;
+        //-(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
         // std::cout << Bphi1 << ' ' << gg << ' ' << vphi1 << '\n';
 
         THETA.resize(data_size + 1);
@@ -197,7 +198,8 @@ namespace jet2 {
         Real Bphi1 = Bphi(theta_j, Bjm, theta_j);
         Real vphi1 = vphi(theta_j, vjm, theta_j);
         Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
-        Real p1 = pa - (Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
+        Real p1 = pa;
+        //    -(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
 
         THETA.resize(data_size + 1);
         P.resize(data_size + 1);
@@ -265,7 +267,7 @@ bool check_p(std::vector<Real> &p) {
 //========================================================================================
 
 Real hydro_coef = 4;
-Real K_amb = 4e-6;
+Real p_amb = 1e-16;
 Real rho_amb = 1.35e-3;
 Real gamma_hydro = 1.33333333333333333;
 
@@ -301,7 +303,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     hydro_coef = gamma_hydro / (gamma_hydro - 1);
 
     // reading parameters of ambient medium
-    K_amb = pin->GetOrAddReal("problem", "K_amb", 4e-6);
+    p_amb = pin->GetOrAddReal("problem", "p_amb", 1e-16);
     rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1.35e-6);
 
     // reading parameters of ejecta
@@ -359,32 +361,23 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("p_jet", p_jet);
     print_par("w", w);
     print_par("eta", eta);
+    print_par("p_amb", p_amb);
+    print_par("p_ej_crit", K_ej * pow(rho_ej, gamma_hydro));
 
     if (jet_model == 2) {
-        Real t = t_jet_launch > t_ej_end ? t_ej_end : t_jet_launch;
+        Real p_a = p_jet;
         for (int i = 0; i < 100; i++) {
-            Real p_a = K_ej * pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
-
-            if (t_ej_end == 0 || std::isinf(rho_ej)) {  // no ejecat
-                p_a = K_amb * pow(rho_amb, gamma_hydro);
-            }
-
             jet2::calc_p_jet_profile(rho_jet, B_jm, v_jet_r, v_jet_jm, p_a, theta_jet);
             Real p_ave_real = calc_p_ave(jet2::THETA, jet2::P);
-
             Real rtol = fabs(p_ave_real - p_jet) / p_jet;
 
             if (rtol < 0.01) {
                 break;
             }
-
             if (p_ave_real < p_jet) {
-                K_ej *= (1 + rtol * 0.5);
-                K_amb *= (1 + rtol * 0.5);
-
+                p_a *= (1 + rtol * 0.5);
             } else {
-                K_ej *= (1 - rtol * 0.5);
-                K_amb *= (1 - rtol * 0.5);
+                p_a *= (1 - rtol * 0.5);
             }
         }
         print_profile(jet2::THETA, jet2::P);
@@ -394,33 +387,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
         print_par("eta", hh);
         print_par("w", hh_star);
         print_par("p_jet<from profile>", p_ave_real);
-        print_par("k_eff", K_ej);
-        print_par("k_amb", K_amb);
     } else if (jet_model == 1) {
-        Real t = t_jet_launch > t_ej_end ? t_ej_end : t_jet_launch;
+        Real p_a = p_jet;
         for (int i = 0; i < 100; i++) {
-            Real p_a = K_ej * pow(rho_ej * 0.25 * t_ej_crit * t_ej_crit / t / t, gamma_hydro);
-
-            if (t_ej_end == 0 || std::isinf(rho_ej)) {  // no ejecat
-                p_a = K_amb * pow(rho_amb, gamma_hydro);
-            }
-
             jet1::calc_p_jet_profile(rho_jet, B_jm, v_jet_r, v_jet_jm, p_a, theta_jet);
             Real p_ave_real = calc_p_ave(jet1::THETA, jet1::P);
-
             Real rtol = fabs(p_ave_real - p_jet) / p_jet;
 
             if (rtol < 0.01) {
                 break;
             }
-
             if (p_ave_real < p_jet) {
-                K_ej *= (1 + rtol * 0.5);
-                K_amb *= (1 + rtol * 0.5);
-
+                p_a *= (1 + rtol * 0.5);
             } else {
-                K_ej *= (1 - rtol * 0.5);
-                K_amb *= (1 - rtol * 0.5);
+                p_a *= (1 - rtol * 0.5);
             }
         }
         print_profile(jet1::THETA, jet1::P);
@@ -430,8 +410,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
         print_par("eta", hh);
         print_par("w", hh_star);
         print_par("p_jet<from profile>", p_ave_real);
-        print_par("k_eff", K_ej);
-        print_par("k_amb", K_amb);
     }
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
@@ -441,8 +419,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-    Real p_amb = K_amb * pow(rho_amb, gamma_hydro);
-
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
