@@ -334,7 +334,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     /// initializing variables
     // ejecta calculations
-    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * (2 * t_ej_crit - t_ej_crit * t_ej_crit / t_ej_end);
+    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * (t_ej_crit + t_ej_crit / 5 * (1 - pow(t_ej_crit / t_ej_end, 5)));
     rho_ej = M_ej / (v_ej * rin * rin * int_coef);
 
     // jet calculations
@@ -475,7 +475,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVX, k, j, il - i) = gamma_ej * v_ej;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1);
+                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1) * (gamma_hydro - 1) / gamma_hydro;
                 }
             }
         }
@@ -496,7 +496,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVX, k, j, il - i) = gamma_ej * vel;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1);
+                    prim(IPR, k, j, il - i) = rho * (eta_ej - 1) * (gamma_hydro - 1) / gamma_hydro;
                 }
             }
         }
