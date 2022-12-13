@@ -376,7 +376,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("w_wind", eta_wind + B_wind * B_wind / rho_wind);
 
     if (jet_model == 2) {
-        Real p_a = p_jet;
+        Real p_a = 3 * p_jet;
         for (int i = 0; i < 100; i++) {
             jet2::calc_p_jet_profile(rho_jet, B_jm, v_jet_r, v_jet_jm, p_a, theta_jet);
             Real p_ave_real = calc_p_ave(jet2::THETA, jet2::P);
@@ -399,7 +399,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
         print_par("w", hh_star);
         print_par("p_jet<from profile>", p_ave_real);
     } else if (jet_model == 1) {
-        Real p_a = p_jet;
+        Real p_a = 3 * p_jet;
         for (int i = 0; i < 100; i++) {
             jet1::calc_p_jet_profile(rho_jet, B_jm, v_jet_r, v_jet_jm, p_a, theta_jet);
             Real p_ave_real = calc_p_ave(jet1::THETA, jet1::P);
