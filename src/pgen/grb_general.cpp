@@ -277,6 +277,7 @@ Real t_ej_end = 0.015;
 Real v_ej = 0.2;
 Real rho_ej = 0;
 Real eta_ej = 1.01;
+Real v_ej_index = 3;
 
 // jet
 Real theta_jet = 0.1;
@@ -312,6 +313,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
     t_ej_end = pin->GetOrAddReal("problem", "t_ej_end", 0.015);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
+    v_ej_index = pin->GetOrAddReal("problem", "p_ej_index", 3);
 
     // reading parameters of jet
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
@@ -484,7 +486,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
     } else if (time < t_ej_end) {
-        Real vel = v_ej * (t_ej_crit * t_ej_crit * t_ej_crit * t_ej_crit) / (time * time * time * time);
+        Real t_r = t_ej_crit / time;
+        Real vel = v_ej * pow(t_r, v_ej_index);
         Real gamma_ej = 1 / std::sqrt(1 - vel * vel);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
