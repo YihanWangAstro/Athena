@@ -132,8 +132,7 @@ namespace jet1 {
         Real Bphi1 = Bphi(theta_j, Bjm, theta_j);
         Real vphi1 = vphi(theta_j, vjm, theta_j);
         Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
-        Real p1 = pa;
-        //-(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
+        Real p1 = pa - (Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
         // std::cout << Bphi1 << ' ' << gg << ' ' << vphi1 << '\n';
 
         THETA.resize(data_size + 1);
@@ -198,8 +197,7 @@ namespace jet2 {
         Real Bphi1 = Bphi(theta_j, Bjm, theta_j);
         Real vphi1 = vphi(theta_j, vjm, theta_j);
         Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
-        Real p1 = pa;
-        //    -(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
+        Real p1 = pa - (Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
 
         THETA.resize(data_size + 1);
         P.resize(data_size + 1);
@@ -291,6 +289,13 @@ Real p_jet = 0;
 Real B_jm = 0;
 
 int jet_model = 0;
+
+Real t_wind_launch = 0;
+Real wind_dt = 0;
+Real B_wind = 0;
+Real rho_wind = 0;
+Real eta_wind = 1;
+
 inline void print_par(std::string name, Real value) { std::cout << name << " = " << value << std::endl; }
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
@@ -328,15 +333,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // Real sigma_B = pin->GetOrAddReal("problem", "sigma_B", 1);
 
     // reading parameters of wind
-    Real t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 0.5);
+    t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 0.5);
     Real Omega = pin->GetOrAddReal("problem", "Omega", 0.2);
-    Real wind_dt = PI / (Omega);
-    Real B_wind = pin->GetOrAddReal("problem", "B_mag", 387) * 1e6 / 3e10 / rin;
-    Real rho_wind = pin->GetOrAddReal("problem", "rho_wind", 1);
+    wind_dt = PI / (Omega);
+    B_wind = pin->GetOrAddReal("problem", "B_mag", 387) * 1e6 / 3e10 / rin;
+    rho_wind = pin->GetOrAddReal("problem", "rho_wind", 1);
+    eta_wind = pin->GetOrAddReal("problem", "eta_wind", 1.001);
 
     /// initializing variables
     // ejecta calculations
-    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) * (t_ej_crit + t_ej_crit / 5 * (1 - pow(t_ej_crit / t_ej_end, 5)));
+    Real int_coef = 2 * PI * (0.5 + 3.0 / 8 * PI) *
+                    (t_ej_crit + t_ej_crit / (v_ej_index + 1) * (1 - pow(t_ej_crit / t_ej_end, (v_ej_index + 1))));
     rho_ej = M_ej / (v_ej * rin * rin * int_coef);
 
     // jet calculations
@@ -366,6 +373,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("p_amb", p_amb);
     print_par("p_ej_crit", rho_ej * (eta_ej - 1));
     print_par("eta_ej", eta_ej);
+    print_par("w_wind", eta_wind + B_wind * B_wind / rho_wind);
 
     if (jet_model == 2) {
         Real p_a = p_jet;
@@ -634,19 +642,17 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         }
     }
 
-    /*if (time >= t_wind_launch) {
-        int index = int(time / wind_dt);
-        // std::cout << "index = " << index << std::endl;
-        Real B_sign = 1.0;
-        // index % 2 == 0 ? 1.0 : -1.0;
+    if (time >= t_wind_launch) {
+        const Real v_wind = 0.1;
+        const Real g_wind = 1 / sqrt(1 - v_wind * v_wind);
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     prim(IDN, k, j, il - i) = rho_wind;
-                    prim(IVX, k, j, il - i) = 0.1 / sqrt(1 - 0.01);
+                    prim(IVX, k, j, il - i) = g_wind * v_wind;
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = B_wind * B_wind / 2;
+                    prim(IPR, k, j, il - i) = rho_wind * (eta_wind - 1) * (gamma_hydro - 1) / gamma_hydro;
                 }
             }
         }
@@ -669,12 +675,12 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku + 1; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        b.x3f(k, j, (il - i)) = B_sign * B_wind;
+                        b.x3f(k, j, (il - i)) = B_wind;
                     }
                 }
             }
         }
-    }*/
+    }
 
     // copy face-centered magnetic fields into ghost zones
 }
