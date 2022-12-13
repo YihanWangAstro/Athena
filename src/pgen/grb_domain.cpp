@@ -363,7 +363,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("eta", eta);
     print_par("p_amb", p_amb);
     print_par("p_ej_crit", k_ej * pow(rho_ej, gamma_hydro));
-    print_par("eta_ej", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej, gamma_hydro) / rho_ej + 1);
+    print_par("eta_ej_crit", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej, gamma_hydro) / rho_ej + 1);
+    print_par("p_ej_inj", k_ej * pow(rho_ej * r_c * r_c / rin / rin, gamma_hydro));
+    print_par("eta_ej_inj", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej * r_c * r_c / rin / rin, gamma_hydro) /
+                                    (rho_ej * r_c * r_c / rin / rin) +
+                                1);
 
     if (jet_model == 2) {
         Real p_a = p_jet;
