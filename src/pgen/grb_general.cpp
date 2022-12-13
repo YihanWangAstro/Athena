@@ -313,7 +313,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_ej_crit = pin->GetOrAddReal("problem", "t_ej_crit", 0.005);
     t_ej_end = pin->GetOrAddReal("problem", "t_ej_end", 0.015);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
-    v_ej_index = pin->GetOrAddReal("problem", "p_ej_index", 3);
+    v_ej_index = pin->GetOrAddReal("problem", "v_ej_index", 3);
 
     // reading parameters of jet
     theta_jet = pin->GetOrAddReal("problem", "theta_jet", 0.17453292519943295);
