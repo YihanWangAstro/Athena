@@ -275,7 +275,7 @@ Real gamma_hydro = 1.33333333333333333;
 Real v_ej = 0.2;
 Real rho_ej = 0;
 Real rho_tail = 0;
-Real eta_ej = 1e-2;
+Real k_ej = 1e-6;
 Real r_c = 0.04333333;
 Real tail_n = 8;
 
@@ -307,7 +307,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1.35e-6);
 
     // reading parameters of ejecta
-    eta_ej = pin->GetOrAddReal("problem", "eta_ej", 1e-3);
+    k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-6);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
     r_c = pin->GetOrAddReal("problem", "r_c", 0.043333);
@@ -362,8 +362,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("w", w);
     print_par("eta", eta);
     print_par("p_amb", p_amb);
-    print_par("p_ej_crit", eta_ej * rho_ej);
-    print_par("eta_ej", eta_ej);
+    print_par("p_ej_crit", k_ej * pow(rho_ej, gamma_hydro));
+    print_par("eta_ej", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej, gamma_hydro) / rho_ej + 1);
 
     if (jet_model == 2) {
         Real p_a = p_jet;
@@ -431,11 +431,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                 if (r < r_c) {
                     rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
                     v = v_ej * r / r_c;
-                    p = eta_ej * rho;
+                    p = k_ej * pow(rho, gamma_hydro);
                 } else if (r < 4 * r_c) {
-                    rho = rho_tail * pow(r / r_c, -8);
-                    v = v_ej * r / r_c;
-                    p = eta_ej * rho;
+                    rho = rho_tail * pow(r / r_c, -tail_n);
+                    v = v_ej;
+                    p = k_ej * pow(rho, gamma_hydro);
                 } else {
                     rho = rho_amb;
                     v = 0;
