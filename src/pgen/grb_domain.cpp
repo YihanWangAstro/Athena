@@ -358,7 +358,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     rho_jet = e_jet / gamma_jet_r / gamma_jet_r / w;
 
-    Real b2 = B_jm * B_jm / gamma_jet_r / gamma_jet_r + v_jet_jm * B_jm * v_jet_jm * B_jm;
+    Real b2 = 0.716 * (B_jm * B_jm) / gamma_jet_r / gamma_jet_r + 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
 
     Real eta = w - b2 / rho_jet;
 
