@@ -290,6 +290,7 @@ Real p_jet = 0;
 Real B_jm = 0;
 
 Real t_wind_launch = 0;
+Real t_wind_last = 10;
 Real B_wind = 0;
 Real rho_wind = 0;
 Real v_wind = 0.1;
@@ -330,23 +331,29 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // Real sigma_B = pin->GetOrAddReal("problem", "sigma_B", 1);
 
     // reading parameters of wind
-    t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 0.5);
-    B_wind = pin->GetOrAddReal("problem", "B_mag", 0.1);
+    t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 6);
+    t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
+    Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
 
     /// initializing variables
     Real gamma_wind = 1 / sqrt(1 - v_wind * v_wind);
-    Real b2_wind = B_wind * B_wind / gamma_wind / gamma_wind;
-    Real sigma_wind = 100;
+
+    Real sigma_wind = 20;
+
+    Real L_wind = E_wind / t_wind_last;
+    Real b2_wind = L_wind / (4 * PI * rin * rin * v_wind * gamma_wind * gamma_wind * (1 + 1 / sigma_wind));
+
+    B_wind = sqrt(b2_wind * gamma_wind * gamma_wind);
 
     rho_wind = b2_wind / sigma_wind;
-
-    Real L_wind = gamma_wind * gamma_wind * (rho_wind + b2_wind) * 4 * PI * rin * rin * v_wind;
 
     p_wind = rho_wind * 1e-6;
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
     rho_tail = 0.01 * M_ej / (4 * PI * r_c * r_c * r_c * (pow(4, 3 - tail_n) - 1) / (3 - tail_n));
+
+    Real E_ej = 0.5 * rho_ej * v_ej * v_ej * 2 * PI * (0.5 + 3.0 / 8 * PI) * r_c * r_c * r_c / 3;
 
     // jet calculations
 
@@ -366,20 +373,37 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     p_jet = rho_jet * (eta - 1) * (gamma_hydro - 1) / gamma_hydro;
 
-    print_par("rho_ej", rho_ej);
-    print_par("rho_jet", rho_jet);
-    print_par("rho_tail", rho_tail);
+    const Real uL = 3e10;
+    const Real uM = 1.989e33;
+    const Real uT = 1;
+    const Real uP = 6.66666e22;
+
+    const Real urho = 74;
+
+    const Real uB = 9.15e11;
+    const Real uE = 1.8e54;
+
+    // print_par("p_amb", p_amb);
+
+    print_par("rho_ej", rho_ej * urho);
+    print_par("rho_tail", rho_tail * urho);
+
+    print_par("rho_jet", rho_jet * urho);
     print_par("sigma", sigma);
-    print_par("p_jet", p_jet);
+    // print_par("p_jet", p_jet);
     print_par("w", w);
     print_par("eta", eta);
-    print_par("p_amb", p_amb);
-    print_par("p_ej_crit", k_ej * pow(rho_ej, gamma_hydro));
+
+    /*print_par("p_ej_crit", k_ej * pow(rho_ej, gamma_hydro));
     print_par("eta_ej_crit", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej, gamma_hydro) / rho_ej + 1);
-    print_par("p_ej_inj", k_ej * pow(rho_ej * r_c * r_c / rin / rin, gamma_hydro));
-    print_par("rho_wind", rho_wind);
-    print_par("p_wind", p_wind);
-    print_par("L_wind", L_wind * 1.8e54 * 4 * PI);
+    print_par("p_ej_inj", k_ej * pow(rho_ej * r_c * r_c / rin / rin, gamma_hydro));*/
+    print_par("rho_wind", rho_wind * urho);
+    print_par("B_wind", B_wind * uB);
+    // print_par("p_wind", p_wind);
+    print_par("L_wind", L_wind * uE / uT);
+    print_par("E_wind", E_wind * uE);
+    print_par("L_jet", L_jet * uE / uT);
+    print_par("E_ej", E_ej * uE);
 
     if (jet_model == 2) {
         Real p_a = p_jet;
@@ -450,7 +474,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     p = k_ej * pow(rho, gamma_hydro);
                 } else if (r < 4 * r_c) {
                     rho = rho_tail * pow(r / r_c, -tail_n);
-                    v = v_ej;
+                    v = v_ej * r / r_c;
                     p = k_ej * pow(rho, gamma_hydro);
                 } else {
                     rho = rho_amb;
@@ -610,7 +634,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         }
     }
 
-    if (time >= t_wind_launch) {
+    if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
@@ -645,6 +669,21 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     }
                 }
             }
+        }
+    } else if (time > (t_wind_launch + t_wind_last)) {
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
+                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
+                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
+                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                }
+            }
+        }
+        if (MAGNETIC_FIELDS_ENABLED) {
+            SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
     }
 

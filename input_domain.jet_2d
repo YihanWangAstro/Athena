@@ -76,10 +76,9 @@ Gamma_inf = 300
 L_jet = 0.00278
 B_jm = 6.7
 
-#t_wind_launch = 1.5
-#Omega = 628
-#B_mag = 387
-#rho_wind = 0.225
+t_wind_launch = 6
+B_mag = 387
+t_wind_last = 10
 
 
 #CODE UNITS
