@@ -9,16 +9,16 @@ problem_id = Jet      # problem ID: basename of output filenames
 <output1>
 file_type  = hdf5        # Binary data dump
 variable   = prim, cons       # variables to be output
-dt         = 1e-2  # time increment between outputs
+dt         = 1e-1  # time increment between outputs
 
 <output2>
 file_type  = rst        # Binary data dump
-dt         = 1e-1  # time increment between outputs
+dt         = 1  # time increment between outputs
 
 <time>
 cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 2      # time limit
+tlim       = 10        # time limit
 integrator  = vl2       # time integration algorithm
 xorder      = 2         # order of spatial reconstruction
 ncycle_out  = 30         # interval for stdout summary info
@@ -26,12 +26,12 @@ ncycle_out  = 30         # interval for stdout summary info
 <mesh>
 nx1        = 600       # Number of zones in X1-direction
 x1min      = 1.66666666e-3        # minimum value of X1
-x1max      = 2       # maximum value of X1
+x1max      = 10       # maximum value of X1
 ix1_bc     = user   # inner-X1 boundary flag
 ox1_bc     = outflow    # outer-X1 boundary flag
-x1rat      = 1.0119068578
+x1rat      = 1.014629380639772
 
-nx2        = 128                 # Number of zones in X2-direction
+nx2        = 256                 # Number of zones in X2-direction
 x2min      = 0                        # minimum value of X2
 x2max      = 1.5707963267948966  # maximum value of X2
 ix2_bc     = polar_wedge             # inner-X2 boundary flag
@@ -54,16 +54,16 @@ nx3 = 1
 <hydro>
 gamma  = 1.3333333333333333333  # gamma = C_p/C_v
 dfloor = 1e-7
-pfloor = 1e-11
+pfloor = 1e-21
 gamma_max=1000
 
 <problem>   
 jet_model = 2
 r_in = 1.66666666e-3
-p_amb = 1.35e-10
+p_amb = 1.35e-15
 rho_amb = 1.35e-6 
 
-k_ej = 1e-4
+k_ej = 1e-7
 M_ej = 0.01
 r_c = 0.04333333
 v_ej = 0.2
@@ -76,9 +76,10 @@ Gamma_inf = 300
 L_jet = 0.00278
 B_jm = 6.7
 
-t_wind_launch = 6
-B_mag = 387
-t_wind_last = 10
+t_wind_launch = 2
+t_wind_last = 1
+E_wind = 6.66666e-6
+sigma_wind = 1
 
 
 #CODE UNITS

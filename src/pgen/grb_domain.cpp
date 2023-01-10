@@ -310,11 +310,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     hydro_coef = gamma_hydro / (gamma_hydro - 1);
 
     // reading parameters of ambient medium
-    p_amb = pin->GetOrAddReal("problem", "p_amb", 1e-16);
+    p_amb = pin->GetOrAddReal("problem", "p_amb", 1e-15);
     rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1.35e-6);
 
     // reading parameters of ejecta
-    k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-6);
+    k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-7);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
     r_c = pin->GetOrAddReal("problem", "r_c", 0.043333);
@@ -334,11 +334,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 6);
     t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
     Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
+    Real sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1);
 
     /// initializing variables
     Real gamma_wind = 1 / sqrt(1 - v_wind * v_wind);
-
-    Real sigma_wind = 20;
 
     Real L_wind = E_wind / t_wind_last;
     Real b2_wind = L_wind / (4 * PI * rin * rin * v_wind * gamma_wind * gamma_wind * (1 + 1 / sigma_wind));
@@ -390,16 +389,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     print_par("rho_jet", rho_jet * urho);
     print_par("sigma", sigma);
-    // print_par("p_jet", p_jet);
+
     print_par("w", w);
     print_par("eta", eta);
 
-    /*print_par("p_ej_crit", k_ej * pow(rho_ej, gamma_hydro));
-    print_par("eta_ej_crit", gamma_hydro / (gamma_hydro - 1) * k_ej * pow(rho_ej, gamma_hydro) / rho_ej + 1);
-    print_par("p_ej_inj", k_ej * pow(rho_ej * r_c * r_c / rin / rin, gamma_hydro));*/
     print_par("rho_wind", rho_wind * urho);
     print_par("B_wind", B_wind * uB);
-    // print_par("p_wind", p_wind);
     print_par("L_wind", L_wind * uE / uT);
     print_par("E_wind", E_wind * uE);
     print_par("L_jet", L_jet * uE / uT);
@@ -474,7 +469,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     p = k_ej * pow(rho, gamma_hydro);
                 } else if (r < 4 * r_c) {
                     rho = rho_tail * pow(r / r_c, -tail_n);
-                    v = v_ej * r / r_c;
+                    v = v_ej;
                     p = k_ej * pow(rho, gamma_hydro);
                 } else {
                     rho = rho_amb;
