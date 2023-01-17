@@ -335,6 +335,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
     Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
     Real sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1);
+    Real ponrho_wind = pin->GetOrAddReal("problem", "ponrho_wind", 1e-6);
 
     /// initializing variables
     Real gamma_wind = 1 / sqrt(1 - v_wind * v_wind);
@@ -346,7 +347,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     rho_wind = b2_wind / sigma_wind;
 
-    p_wind = rho_wind * 1e-6;
+    p_wind = rho_wind * ponrho_wind;
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
