@@ -80,7 +80,7 @@ t_wind_launch = 2
 t_wind_last = 1
 E_wind = 6.66666e-6
 sigma_wind = 1
-ponrho_wind = 1e-6
+k_wind = 1e-6
 
 
 #CODE UNITS
