@@ -341,16 +341,21 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real gamma_wind = 1 / sqrt(1 - v_wind * v_wind);
 
     Real L_wind = E_wind / t_wind_last;
-    Real b2_wind = L_wind / (4 * PI * rin * rin * v_wind * gamma_wind * gamma_wind * (1 + 1 / sigma_wind));
 
-    B_wind = sqrt(b2_wind * gamma_wind * gamma_wind);
+    Real e_wind = L_wind / (4 * PI * rin * rin * v_wind);
 
-    rho_wind = b2_wind / sigma_wind;
+    Real B2_wind = e_wind / (1 + 1 / sigma_wind - 1.0 / 2.0 / gamma_wind / gamma_wind -
+                             k_wind / (hydro_coef * k_wind + 1) / gamma_wind / gamma_wind / sigma_wind);
 
-    p_wind = k_wind * pow(rho_wind, gamma_hydro);
+    rho_wind = B2_wind / gamma_wind / gamma_wind / sigma_wind / (hydro_coef * k_wind + 1);
+
+    p_wind = k_wind * rho_wind;
+
+    B_wind = sqrt(B2_wind);
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
+
     rho_tail = 0.01 * M_ej / (4 * PI * r_c * r_c * r_c * (pow(4, 3 - tail_n) - 1) / (3 - tail_n));
 
     Real E_ej = 0.5 * rho_ej * v_ej * v_ej * 2 * PI * (0.5 + 3.0 / 8 * PI) * r_c * r_c * r_c / 3;
@@ -363,15 +368,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);
 
-    rho_jet = e_jet / gamma_jet_r / gamma_jet_r / w;
+    Real vB2 = 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
 
-    Real b2 = 0.716 * (B_jm * B_jm) / gamma_jet_r / gamma_jet_r + 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
+    Real b2 = 0.716 * (B_jm * B_jm) / gamma_jet_r / gamma_jet_r + vB2;
+
+    Real pm_jet = 0.5 * b2;
+
+    p_jet = (e_jet + pm_jet + gamma_jet_r * gamma_jet_r * vB2 - gamma_jet_r * gamma_jet_r * b2 * w / (w - 1)) /
+            (hydro_coef * w / (w - 1) * gamma_jet_r * gamma_jet_r - 1);
+
+    rho_jet = (hydro_coef * p_jet + b2) / (w - 1);
 
     Real eta = w - b2 / rho_jet;
 
     Real sigma = w / eta - 1;
-
-    p_jet = rho_jet * (eta - 1) * (gamma_hydro - 1) / gamma_hydro;
 
     const Real uL = 3e10;
     const Real uM = 1.989e33;
@@ -512,6 +522,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     }
 }
 
+inline Real transit(Real t, Real t0, Real width) { return 1 / (1 + std::exp((t - t0) / width)); }
+
 void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, FaceField &b, Real time, Real dt, int il,
                  int iu, int jl, int ju, int kl, int ku, int ngh) {
     if (std::strcmp(COORDINATE_SYSTEM, "spherical_polar") != 0) {
@@ -612,16 +624,28 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
         }
-    } else {
+    } else if (time < t_wind_launch) {  // artificial transition from jet to wind
         // std::cout << "jet end t= " << time << "\n";
+        static Real rho_diff = prim(IDN, (kl + ku) / 2, (jl + ju) / 2, il) - rho_wind;
+        static Real v_diff = prim(IVX, (kl + ku) / 2, (jl + ju) / 2, il) - v_wind;
+        static Real p_diff = prim(IPR, (kl + ku) / 2, (jl + ju) / 2, il) - p_wind;
+        static Real t_0 = 0.5 * (t_wind_launch + t_jet_duration);
+        static Real width_t = (t_wind_launch - t_jet_duration) / 10;
+
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                    /* prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
+                     prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                     prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
+                     prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
+                     prim(IPR, k, j, il - i) = prim(IPR, k, j, il);*/
+                    Real v = v_diff * transit(time, t_0, width_t) + v_wind;
+                    prim(IDN, k, j, il - i) = rho_diff * transit(time, t_0, width_t) + rho_wind;
+                    prim(IVX, k, j, il - i) = v / sqrt(1 - v * v);
                     prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
                     prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                    prim(IPR, k, j, il - i) = p_diff * transit(time, t_0, width_t) + p_wind;
                 }
             }
         }
@@ -647,14 +671,14 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = b.x1f(k, j, (il));
+                        b.x1f(k, j, (il - i)) = 0;
                     }
                 }
             }
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju + 1; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        b.x2f(k, j, (il - i)) = b.x2f(k, j, (il));
+                        b.x2f(k, j, (il - i)) = 0;
                     }
                 }
             }
