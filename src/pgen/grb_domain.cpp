@@ -625,13 +625,43 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             }
         }
     } else if (time < t_wind_launch) {  // artificial transition from jet to wind
-        // std::cout << "jet end t= " << time << "\n";
-        /* static Real rho_diff = prim(IDN, (kl + ku) / 2, (jl + ju) / 2, il) - rho_wind;
-         static Real v_diff = prim(IVX, (kl + ku) / 2, (jl + ju) / 2, il) - v_wind;
-         static Real p_diff = prim(IPR, (kl + ku) / 2, (jl + ju) / 2, il) - p_wind;
-         static Real t_0 = 0.5 * (t_wind_launch + t_jet_duration);
-         static Real width_t = (t_wind_launch - t_jet_duration) / 10;*/
-
+        Real t_r = (t_wind_launch - time) / (t_wind_launch - t_jet_duration);
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    prim(IDN, k, j, il - i) = t_r * prim(IDN, k, j, il) + (1 - t_r) * rho_wind;
+                    prim(IVX, k, j, il - i) =
+                        t_r * prim(IVX, k, j, il) + (1 - t_r) * v_wind / sqrt(1 - v_wind * v_wind);
+                    prim(IVY, k, j, il - i) = t_r * prim(IVY, k, j, il);
+                    prim(IVZ, k, j, il - i) = t_r * prim(IVZ, k, j, il);
+                    prim(IPR, k, j, il - i) = t_r * prim(IPR, k, j, il) + (1 - t_r) * p_wind;
+                }
+            }
+        }
+        if (MAGNETIC_FIELDS_ENABLED) {
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x1f(k, j, (il - i)) = t_r * b.x1f(k, j, il);
+                    }
+                }
+            }
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju + 1; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x2f(k, j, (il - i)) = t_r * b.x2f(k, j, il);
+                    }
+                }
+            }
+            for (int k = kl; k <= ku + 1; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x3f(k, j, (il - i)) = t_r * b.x3f(k, j, il) + (1 - t_r) * B_wind;
+                    }
+                }
+            }
+        }
+    } /*else if (time < t_wind_launch) {  // artificial transition from jet to wind
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
@@ -640,19 +670,33 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
                     prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
                     prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
-                    /*Real v = v_diff * transit(time, t_0, width_t) + v_wind;
-                    prim(IDN, k, j, il - i) = rho_diff * transit(time, t_0, width_t) + rho_wind;
-                    prim(IVX, k, j, il - i) = v / sqrt(1 - v * v);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = p_diff * transit(time, t_0, width_t) + p_wind;*/
                 }
             }
         }
         if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x1f(k, j, (il - i)) = b.x1f(k, j, il);
+                    }
+                }
+            }
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju + 1; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x2f(k, j, (il - i)) = b.x2f(k, j, il);
+                    }
+                }
+            }
+            for (int k = kl; k <= ku + 1; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x3f(k, j, (il - i)) = b.x3f(k, j, il);
+                    }
+                }
+            }
         }
-    }
+    }*/
 
     if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
         for (int k = kl; k <= ku; ++k) {
