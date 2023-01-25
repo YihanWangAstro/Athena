@@ -58,6 +58,29 @@
         }                                                \
     }
 
+#define SET_MAGNETIC_FIELD_BC_ZERO           \
+    for (int k = kl; k <= ku; ++k) {         \
+        for (int j = jl; j <= ju; ++j) {     \
+            for (int i = 1; i <= ngh; ++i) { \
+                b.x1f(k, j, (il - i)) = 0.0; \
+            }                                \
+        }                                    \
+    }                                        \
+    for (int k = kl; k <= ku; ++k) {         \
+        for (int j = jl; j <= ju + 1; ++j) { \
+            for (int i = 1; i <= ngh; ++i) { \
+                b.x2f(k, j, (il - i)) = 0.0; \
+            }                                \
+        }                                    \
+    }                                        \
+    for (int k = kl; k <= ku + 1; ++k) {     \
+        for (int j = jl; j <= ju; ++j) {     \
+            for (int i = 1; i <= ngh; ++i) { \
+                b.x3f(k, j, (il - i)) = 0.0; \
+            }                                \
+        }                                    \
+    }
+
 void LoopInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b, Real time, Real dt, int il,
                  int iu, int jl, int ju, int kl, int ku, int ngh);
 
@@ -338,7 +361,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
 
     /// initializing variables
-    Real gamma_wind = 1 / sqrt(1 - v_wind * v_wind);
+    Real gamma_wind = 300;
+
+    v_wind = sqrt(1 - 1 / gamma_wind / gamma_wind);
 
     Real L_wind = E_wind / t_wind_last;
 
@@ -534,47 +559,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
     if (time < t_jet_duration) {
         // std::cout << "jet launch t= " << time << "\n";
         if (MAGNETIC_FIELDS_ENABLED) {
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            b.x1f(k, j, (il - i)) = 0.0;
-                        } else {
-                            b.x1f(k, j, (il - i)) = b.x1f(k, j, il);
-                        }
-                    }
-                }
-            }
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju + 1; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            b.x2f(k, j, (il - i)) = 0.0;
-                        } else {
-                            b.x2f(k, j, (il - i)) = b.x2f(k, j, il);
-                        }
-                    }
-                }
-            }
-            for (int k = kl; k <= ku + 1; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            if (jet_model == 0) {
-                                b.x3f(k, j, (il - i)) = B_jm;
-                            } else if (jet_model == 1) {
-                                b.x3f(k, j, (il - i)) = jet1::Bphi(pcoord->x2v(j), B_jm, theta_jet);
-                            } else if (jet_model == 2) {
-                                b.x3f(k, j, (il - i)) = jet2::Bphi(pcoord->x2v(j), B_jm, theta_jet);
-                            } else {
-                                b.x3f(k, j, (il - i)) = 0.0;
-                            }
-                        } else {
-                            b.x3f(k, j, (il - i)) = b.x3f(k, j, il);
-                        }
-                    }
-                }
-            }
+            SET_MAGNETIC_FIELD_BC_ZERO
         }
 
         for (int k = kl; k <= ku; ++k) {
@@ -592,7 +577,6 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                         } else if (jet_model == 1) {
                             Real v_phi = jet1::vphi(pcoord->x2v(j), v_jet_jm, theta_jet);
                             Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v_phi * v_phi);
-
                             prim(IDN, k, j, il - i) = rho_jet;
                             prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
                             prim(IVY, k, j, il - i) = 0.0;
@@ -624,49 +608,12 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
         }
-    } else if (time < t_wind_launch) {  // artificial transition from jet to wind
-        Real t_r = (t_wind_launch - time) / (t_wind_launch - t_jet_duration);
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = t_r * prim(IDN, k, j, il) + (1 - t_r) * rho_wind;
-                    prim(IVX, k, j, il - i) =
-                        t_r * prim(IVX, k, j, il) + (1 - t_r) * v_wind / sqrt(1 - v_wind * v_wind);
-                    prim(IVY, k, j, il - i) = t_r * prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = t_r * prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = t_r * prim(IPR, k, j, il) + (1 - t_r) * p_wind;
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = t_r * b.x1f(k, j, il);
-                    }
-                }
-            }
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju + 1; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x2f(k, j, (il - i)) = t_r * b.x2f(k, j, il);
-                    }
-                }
-            }
-            for (int k = kl; k <= ku + 1; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x3f(k, j, (il - i)) = t_r * b.x3f(k, j, il) + (1 - t_r) * B_wind;
-                    }
-                }
-            }
-        }
-    } /*else if (time < t_wind_launch) {  // artificial transition from jet to wind
+    } else if (time < t_wind_launch) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                    prim(IVX, k, j, il - i) = -prim(IVX, k, j, il);
                     prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
                     prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
                     prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
@@ -674,29 +621,9 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             }
         }
         if (MAGNETIC_FIELDS_ENABLED) {
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = b.x1f(k, j, il);
-                    }
-                }
-            }
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju + 1; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x2f(k, j, (il - i)) = b.x2f(k, j, il);
-                    }
-                }
-            }
-            for (int k = kl; k <= ku + 1; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x3f(k, j, (il - i)) = b.x3f(k, j, il);
-                    }
-                }
-            }
+            SET_MAGNETIC_FIELD_BC_ZERO
         }
-    }*/
+    }
 
     if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
         for (int k = kl; k <= ku; ++k) {
