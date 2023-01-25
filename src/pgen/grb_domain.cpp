@@ -559,7 +559,47 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
     if (time < t_jet_duration) {
         // std::cout << "jet launch t= " << time << "\n";
         if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_ZERO
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        if (pcoord->x2v(j) < theta_jet) {
+                            b.x1f(k, j, (il - i)) = 0.0;
+                        } else {
+                            b.x1f(k, j, (il - i)) = b.x1f(k, j, il);
+                        }
+                    }
+                }
+            }
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju + 1; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        if (pcoord->x2v(j) < theta_jet) {
+                            b.x2f(k, j, (il - i)) = 0.0;
+                        } else {
+                            b.x2f(k, j, (il - i)) = b.x2f(k, j, il);
+                        }
+                    }
+                }
+            }
+            for (int k = kl; k <= ku + 1; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = 1; i <= ngh; ++i) {
+                        if (pcoord->x2v(j) < theta_jet) {
+                            if (jet_model == 0) {
+                                b.x3f(k, j, (il - i)) = B_jm;
+                            } else if (jet_model == 1) {
+                                b.x3f(k, j, (il - i)) = jet1::Bphi(pcoord->x2v(j), B_jm, theta_jet);
+                            } else if (jet_model == 2) {
+                                b.x3f(k, j, (il - i)) = jet2::Bphi(pcoord->x2v(j), B_jm, theta_jet);
+                            } else {
+                                b.x3f(k, j, (il - i)) = 0.0;
+                            }
+                        } else {
+                            b.x3f(k, j, (il - i)) = b.x3f(k, j, il);
+                        }
+                    }
+                }
+            }
         }
 
         for (int k = kl; k <= ku; ++k) {
@@ -621,7 +661,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             }
         }
         if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_ZERO
+            SET_MAGNETIC_FIELD_BC_OUTFLOW
         }
     }
 
