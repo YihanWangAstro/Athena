@@ -654,8 +654,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int i = 1; i <= ngh; ++i) {
                     prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
                     prim(IVX, k, j, il - i) = -prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
+                    prim(IVY, k, j, il - i) = -prim(IVY, k, j, il);
+                    prim(IVZ, k, j, il - i) = -prim(IVZ, k, j, il);
                     prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
                 }
             }
