@@ -58,27 +58,27 @@
         }                                                \
     }
 
-#define SET_MAGNETIC_FIELD_BC_REFLECTING                  \
-    for (int k = kl; k <= ku; ++k) {                      \
-        for (int j = jl; j <= ju; ++j) {                  \
-            for (int i = 1; i <= ngh; ++i) {              \
-                b.x1f(k, j, (il - i)) = -b.x1f(k, j, il); \
-            }                                             \
-        }                                                 \
-    }                                                     \
-    for (int k = kl; k <= ku; ++k) {                      \
-        for (int j = jl; j <= ju + 1; ++j) {              \
-            for (int i = 1; i <= ngh; ++i) {              \
-                b.x2f(k, j, (il - i)) = b.x2f(k, j, il);  \
-            }                                             \
-        }                                                 \
-    }                                                     \
-    for (int k = kl; k <= ku + 1; ++k) {                  \
-        for (int j = jl; j <= ju; ++j) {                  \
-            for (int i = 1; i <= ngh; ++i) {              \
-                b.x3f(k, j, (il - i)) = b.x3f(k, j, il);  \
-            }                                             \
-        }                                                 \
+#define SET_MAGNETIC_FIELD_BC_REFLECTING                          \
+    for (int k = kl; k <= ku; ++k) {                              \
+        for (int j = jl; j <= ju; ++j) {                          \
+            for (int i = 1; i <= ngh; ++i) {                      \
+                b.x1f(k, j, (il - i)) = -b.x1f(k, j, il + i - 1); \
+            }                                                     \
+        }                                                         \
+    }                                                             \
+    for (int k = kl; k <= ku; ++k) {                              \
+        for (int j = jl; j <= ju + 1; ++j) {                      \
+            for (int i = 1; i <= ngh; ++i) {                      \
+                b.x2f(k, j, (il - i)) = b.x2f(k, j, il + i - 1);  \
+            }                                                     \
+        }                                                         \
+    }                                                             \
+    for (int k = kl; k <= ku + 1; ++k) {                          \
+        for (int j = jl; j <= ju; ++j) {                          \
+            for (int i = 1; i <= ngh; ++i) {                      \
+                b.x3f(k, j, (il - i)) = b.x3f(k, j, il + i - 1);  \
+            }                                                     \
+        }                                                         \
     }
 
 #define SET_MAGNETIC_FIELD_BC_ZERO           \
@@ -384,7 +384,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
 
     /// initializing variables
-    Real gamma_wind = 300;
+    Real gamma_wind = 100;
 
     v_wind = sqrt(1 - 1 / gamma_wind / gamma_wind);
 
@@ -400,6 +400,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     p_wind = k_wind * rho_wind;
 
     B_wind = sqrt(B2_wind);
+    Real pm_wind = 0.5 * (B_wind * B_wind / gamma_wind / gamma_wind);
+    std::cout << (gamma_wind * gamma_wind * (rho_wind + hydro_coef * p_wind + 2 * pm_wind) - p_wind - pm_wind) *
+                     (4 * PI * rin * rin * v_wind) * 1.8e54
+              << std::endl;
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
@@ -675,11 +679,11 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                    prim(IVX, k, j, il - i) = -prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
+                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
+                    prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
+                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il + i - 1);
+                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il + i - 1);
+                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il + i - 1);
                 }
             }
         }
