@@ -589,22 +589,14 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            b.x1f(k, j, (il - i)) = 0.0;
-                        } else {
-                            b.x1f(k, j, (il - i)) = b.x1f(k, j, il);
-                        }
+                        b.x1f(k, j, (il - i)) = 0.0;
                     }
                 }
             }
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju + 1; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            b.x2f(k, j, (il - i)) = 0.0;
-                        } else {
-                            b.x2f(k, j, (il - i)) = b.x2f(k, j, il);
-                        }
+                        b.x2f(k, j, (il - i)) = 0.0;
                     }
                 }
             }
@@ -622,7 +614,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                                 b.x3f(k, j, (il - i)) = 0.0;
                             }
                         } else {
-                            b.x3f(k, j, (il - i)) = b.x3f(k, j, il);
+                            b.x3f(k, j, (il - i)) = 0.0;
                         }
                     }
                 }
