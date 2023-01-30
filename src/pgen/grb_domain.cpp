@@ -400,10 +400,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     p_wind = k_wind * rho_wind;
 
     B_wind = sqrt(B2_wind);
-    Real pm_wind = 0.5 * (B_wind * B_wind / gamma_wind / gamma_wind);
-    std::cout << (gamma_wind * gamma_wind * (rho_wind + hydro_coef * p_wind + 2 * pm_wind) - p_wind - pm_wind) *
-                     (4 * PI * rin * rin * v_wind) * 1.8e54
-              << std::endl;
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
@@ -418,7 +414,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real w = Gamma_inf / gamma_jet_r;
 
-    Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);
+    Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
+
+    e_jet = e_jet * 2 / (1 - cos(theta_jet));
 
     Real vB2 = 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
 
@@ -480,12 +478,25 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
             }
         }
         print_profile(jet2::THETA, jet2::P);
+        Real L0 = 0;
+        Real dtt = jet2::THETA[1] - jet2::THETA[0];
+
+        for (size_t i = 0; i < jet2::THETA.size(); ++i) {
+            Real tt = jet2::THETA[i];
+            Real v_phi = jet2::vphi(tt, v_jet_jm, theta_jet);
+            Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v_phi * v_phi);
+            Real pp = get_p_value(jet2::THETA, jet2::P, tt);
+            Real BB = jet2::Bphi(tt, B_jm, theta_jet);
+            Real pm = 0.5 * (BB * BB / gamma_jet / gamma_jet + v_phi * v_phi * BB * BB);
+            Real e = gamma_jet * gamma_jet * (rho_jet + 4 * pp + 2 * pm - v_phi * v_phi * BB * BB) - pp - pm;
+            L0 += e * rin * rin * 2 * PI * sin(tt) * dtt;
+        }
         Real p_ave_real = calc_p_ave(jet2::THETA, jet2::P);
         Real hh = 1 + gamma_hydro / (gamma_hydro - 1) * p_ave_real / rho_jet;
         Real hh_star = hh + b2 / rho_jet;
         print_par("eta", hh);
-        print_par("w", hh_star);
         print_par("p_jet<from profile>", p_ave_real);
+        print_par("L_jet<from profile>", L0 * uE / uT);
     } else if (jet_model == 1) {
         Real p_a = p_jet;
         for (int i = 0; i < 100; i++) {
@@ -548,7 +559,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             }
         }
     }
-
     if (MAGNETIC_FIELDS_ENABLED) {
         for (int k = ks; k <= ke; ++k) {
             for (int j = js; j <= je; ++j) {
@@ -652,14 +662,14 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                             prim(IPR, k, j, il - i) = get_p_value(jet2::THETA, jet2::P, pcoord->x2v(j));
                         } else {
                             prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                            prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                            prim(IVX, k, j, il - i) = -prim(IVX, k, j, il);
                             prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
                             prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
                             prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
                         }
                     } else {
                         prim(IDN, k, j, il - i) = prim(IDN, k, j, il);
-                        prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                        prim(IVX, k, j, il - i) = -prim(IVX, k, j, il);
                         prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
                         prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il);
                         prim(IPR, k, j, il - i) = prim(IPR, k, j, il);
