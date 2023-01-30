@@ -245,7 +245,7 @@ namespace jet2 {
         Real vphi1 = vphi(theta_j, vjm, theta_j);
         Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
         Real p1 = pa;
-        //    -(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
+        //-(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
 
         THETA.resize(data_size + 1);
         P.resize(data_size + 1);
@@ -416,7 +416,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
 
-    e_jet = e_jet * 2 / (1 - cos(theta_jet));
+    // e_jet = e_jet * 2 / (1 - cos(theta_jet));
 
     Real vB2 = 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
 
