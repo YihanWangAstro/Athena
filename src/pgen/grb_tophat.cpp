@@ -107,113 +107,6 @@
 void LoopInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b, Real time, Real dt, int il,
                  int iu, int jl, int ju, int kl, int ku, int ngh);
 
-namespace jet {
-    const Real const_jet_alpha = 0.4;
-    size_t data_size = 10000;
-    std::vector<Real> THETA;
-    std::vector<Real> P;
-
-    inline Real Bphi(Real theta, Real Bjm, Real theta_j) {
-        Real theta_m = theta_j * const_jet_alpha;
-        Real ratio = theta / theta_m;
-        return 2 * Bjm * ratio / (1 + ratio * ratio);
-    }
-
-    inline Real dBdtheta(Real theta, Real Bjm, Real theta_j) {
-        Real theta_m = theta_j * const_jet_alpha;
-        Real ratio = theta / theta_m;
-        return 2 * Bjm * (1 - ratio * ratio) / (1 + ratio * ratio) / (1 + ratio * ratio) / theta_m;
-    }
-
-    inline Real vphi(Real theta, Real vjm, Real theta_j) {
-        Real ratio = theta / theta_j;
-        return vjm * ratio;
-    }
-
-    inline Real dvdtheta(Real theta, Real vjm, Real theta_j) { return vjm / theta_j; }
-
-    Real dpdtheta(Real theta, Real rho, Real p_now, Real Bjm, Real vr, Real vjm, Real theta_j) {
-        Real Bphi_ = Bphi(theta, Bjm, theta_j);
-        Real vphi_ = vphi(theta, vjm, theta_j);
-        Real dBdtheta_ = dBdtheta(theta, Bjm, theta_j);
-        Real dvdtheta_ = dvdtheta(theta, vjm, theta_j);
-
-        Real g = 1.0 / std::sqrt(1 - vr * vr - vphi_ * vphi_);
-        Real g2 = g * g;
-        Real b2 = Bphi_ * Bphi_ / g / g + vphi_ * Bphi_ * vphi_ * Bphi_;
-
-        Real rhow = rho + 4 * p_now + b2;
-        return (rhow * g2 * vphi_ * vphi_ - Bphi_ * Bphi_ / g2) / theta - Bphi_ * dBdtheta_ / g2 -
-               (vphi_ * Bphi_) * (Bphi_ * dvdtheta_ + vphi_ * dBdtheta_);
-    }
-
-    void calc_p_jet_profile(Real rho, Real Bjm, Real vr, Real vjm, Real pa, Real theta_j) {
-        Real Bphi1 = Bphi(theta_j, Bjm, theta_j);
-        Real vphi1 = vphi(theta_j, vjm, theta_j);
-        Real gg = 1 / sqrt(1 - vphi1 * vphi1 - vr * vr);
-        Real p1 = pa;
-        //-(Bphi1 * Bphi1 / gg / gg + vphi1 * Bphi1 * vphi1 * Bphi1) / 2;
-
-        THETA.resize(data_size + 1);
-        P.resize(data_size + 1);
-        size_t len = THETA.size() - 1;
-
-        // std::cout << "p1 = " << p1 << " pa =" << pa << " rho = " << rho << std::endl;
-
-        for (size_t i = 0; i <= len; i++) {
-            THETA[i] = theta_j * static_cast<Real>(i) / static_cast<Real>(len);
-            P[i] = p1;
-        }
-        Real dtheta = THETA[1] - THETA[0];
-        for (int i = data_size - 1; i >= 0; i--) {
-            P[i] = P[i + 1] - dpdtheta(THETA[i + 1], rho, P[i + 1], Bjm, vr, vjm, theta_j) * dtheta;
-            // if (P[i] < 0) P[i] = 0;
-        }
-    }
-}  // namespace jet
-
-Real get_p_value(std::vector<Real> &theta, std::vector<Real> &p, Real theta_now) {
-    if (theta_now < theta[0]) {
-        return p[0];
-    }
-    if (theta_now > theta.back()) {
-        return p.back();
-    }
-    size_t i = 0;
-    while (theta[i] < theta_now) {
-        i++;
-    }
-    Real p1 = p[i - 1];
-    Real p2 = p[i];
-    Real theta1 = theta[i - 1];
-    Real theta2 = theta[i];
-    return p1 + (p2 - p1) * (theta_now - theta1) / (theta2 - theta1);
-}
-
-Real calc_p_ave(std::vector<Real> &theta, std::vector<Real> &p) {
-    Real p_ave = 0;
-    for (size_t i = 0; i < theta.size() - 1; i++) {
-        p_ave += (p[i] + p[i + 1]) / 2 * ((theta[i + 1] + theta[i]) / 2) * (theta[i + 1] - theta[i]);
-    }
-    Real theta_max = theta[theta.size() - 1];
-    return p_ave / (theta_max * theta_max / 2);
-}
-
-void print_profile(std::vector<Real> &theta, std::vector<Real> &p) {
-    for (size_t i = 0; i < p.size(); i += 100) {
-        std::cout << "theta = " << theta[i] << ", p = " << p[i] << std::endl;
-    }
-}
-
-bool check_p(std::vector<Real> &p) {
-    for (auto pi : p) {
-        if (pi < 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
 //========================================================================================
 //! \fn void MeshBlock::ProblemGenerator(ParameterInput *pin)
 //! \brief Spherical blast wave test problem generator
@@ -324,15 +217,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
 
-    // e_jet = e_jet * 2 / (1 - cos(theta_jet));
-
-    Real vB2 = 0.454 * (v_jet_jm * B_jm * v_jet_jm * B_jm);
-
-    Real b2 = 0.716 * (B_jm * B_jm) / gamma_jet_r / gamma_jet_r + vB2;
+    Real b2 = (B_jm * B_jm) / gamma_jet_r / gamma_jet_r;
 
     Real pm_jet = 0.5 * b2;
 
-    p_jet = (e_jet + pm_jet + gamma_jet_r * gamma_jet_r * vB2 - gamma_jet_r * gamma_jet_r * b2 * w / (w - 1)) /
+    p_jet = (e_jet + pm_jet - gamma_jet_r * gamma_jet_r * b2 * w / (w - 1)) /
             (hydro_coef * w / (w - 1) * gamma_jet_r * gamma_jet_r - 1);
 
     rho_jet = (hydro_coef * p_jet + b2) / (w - 1);
@@ -368,42 +257,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("E_wind", E_wind * uE);
     print_par("L_jet", L_jet * uE / uT);
     print_par("E_ej", E_ej * uE);
-
-    Real p_a = p_jet;
-    for (int i = 0; i < 100; i++) {
-        jet::calc_p_jet_profile(rho_jet, B_jm, v_jet_r, v_jet_jm, p_a, theta_jet);
-        Real p_ave_real = calc_p_ave(jet::THETA, jet::P);
-        Real rtol = fabs(p_ave_real - p_jet) / p_jet;
-
-        if (rtol < 0.01) {
-            break;
-        }
-        if (p_ave_real < p_jet) {
-            p_a *= (1 + rtol * 0.5);
-        } else {
-            p_a *= (1 - rtol * 0.5);
-        }
-    }
-    print_profile(jet::THETA, jet::P);
-    Real L0 = 0;
-    Real dtt = jet::THETA[1] - jet::THETA[0];
-
-    for (size_t i = 0; i < jet::THETA.size(); ++i) {
-        Real tt = jet::THETA[i];
-        Real v_phi = jet::vphi(tt, v_jet_jm, theta_jet);
-        Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v_phi * v_phi);
-        Real pp = get_p_value(jet::THETA, jet::P, tt);
-        Real BB = jet::Bphi(tt, B_jm, theta_jet);
-        Real pm = 0.5 * (BB * BB / gamma_jet / gamma_jet + v_phi * v_phi * BB * BB);
-        Real e = gamma_jet * gamma_jet * (rho_jet + 4 * pp + 2 * pm - v_phi * v_phi * BB * BB) - pp - pm;
-        L0 += e * rin * rin * 2 * PI * sin(tt) * dtt;
-    }
-    Real p_ave_real = calc_p_ave(jet::THETA, jet::P);
-    Real hh = 1 + gamma_hydro / (gamma_hydro - 1) * p_ave_real / rho_jet;
-    Real hh_star = hh + b2 / rho_jet;
-    print_par("eta", hh);
-    print_par("p_jet<from profile>", p_ave_real);
-    print_par("L_jet<from profile>", L0 * uE / uT);
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -505,7 +358,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
                         if (pcoord->x2v(j) < theta_jet) {
-                            b.x3f(k, j, (il - i)) = jet::Bphi(pcoord->x2v(j), B_jm, theta_jet);
+                            b.x3f(k, j, (il - i)) = B_jm;
                         } else {
                             b.x3f(k, j, (il - i)) = 0.0;
                         }
@@ -518,14 +371,12 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int j = ju; j >= jl; --j) {
                 for (int i = 1; i <= ngh; ++i) {
                     if (pcoord->x2v(j) < theta_jet) {
-                        Real v_phi = jet::vphi(pcoord->x2v(j), v_jet_jm, theta_jet);
-                        Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r - v_phi * v_phi);
-
+                        Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);
                         prim(IDN, k, j, il - i) = rho_jet;
                         prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
                         prim(IVY, k, j, il - i) = 0.0;
-                        prim(IVZ, k, j, il - i) = gamma_jet * v_phi;
-                        prim(IPR, k, j, il - i) = get_p_value(jet::THETA, jet::P, pcoord->x2v(j));
+                        prim(IVZ, k, j, il - i) = 0;
+                        prim(IPR, k, j, il - i) = p_jet;
                     } else {
                         prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
                         prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
