@@ -75,7 +75,8 @@ v_jet_r = 0.8
 v_jet_jm = 0.2
 Gamma_inf = 300
 L_jet = 2.78e-3
-B_jm = 1.1
+sigma_jet = 10
+#B_jm = 1.1
 
 t_wind_launch = 1
 t_wind_last = 1

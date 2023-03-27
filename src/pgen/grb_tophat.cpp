@@ -17,6 +17,7 @@
 #include <math.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>   // fopen(), fprintf(), freopen()
 #include <cstring>  // strcmp()
@@ -143,7 +144,9 @@ Real rho_wind = 0;
 Real v_wind = 0.1;
 Real p_wind = 0;
 
-inline void print_par(std::string name, Real value) { std::cout << name << " = " << value << std::endl; }
+inline void print_par(std::string name, Real value, Real code_val) {
+    std::cout << name << " = " << value << ',' << code_val << std::endl;
+}
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
     // reading model parameters
@@ -173,9 +176,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     v_jet_jm = pin->GetOrAddReal("problem", "v_jet_jm", 0.4);
     Real Gamma_inf = pin->GetOrAddReal("problem", "Gamma_inf", 300);
     Real L_jet = pin->GetOrAddReal("problem", "L_jet", 0.00278);
+    Real sigma_jet = pin->GetOrAddReal("problem", "sigma_jet", 1);
 
-    B_jm = pin->GetOrAddReal("problem", "B_jm", 6.777);
-    // Real sigma_B = pin->GetOrAddReal("problem", "sigma_B", 1);
+    // B_jm = pin->GetOrAddReal("problem", "B_jm", 6.777);
+    //  Real sigma_B = pin->GetOrAddReal("problem", "sigma_B", 1);
 
     // reading parameters of wind
     t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 6);
@@ -215,9 +219,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real w = Gamma_inf / gamma_jet_r;
 
+    Real eta = w / (sigma_jet + 1);
+
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
 
-    Real b2 = (B_jm * B_jm) / gamma_jet_r / gamma_jet_r;
+    rho_jet = e_jet / (gamma_jet_r * gamma_jet_r * w - 0.5 * w / (1 + 1 / sigma_jet) - (eta - 1) / hydro_coef);
+
+    p_jet = (eta - 1) / hydro_coef * rho_jet;
+
+    Real b2 = rho_jet * w / (1 / sigma_jet + 1);
+
+    B_jm = gamma_jet_r * sqrt(b2);
+
+    /*Real b2 = (B_jm * B_jm) / gamma_jet_r / gamma_jet_r;
 
     Real pm_jet = 0.5 * b2;
 
@@ -228,7 +242,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real eta = w - b2 / rho_jet;
 
-    Real sigma = w / eta - 1;
+    Real sigma = w / eta - 1;*/
 
     const Real uL = 3e10;
     const Real uM = 1.989e33;
@@ -242,21 +256,23 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     // print_par("p_amb", p_amb);
 
-    print_par("rho_ej", rho_ej * urho);
-    print_par("rho_tail", rho_tail * urho);
+    print_par("E_ej", E_ej * uE, E_ej);
+    print_par("rho_ej", rho_ej * urho, rho_ej);
+    print_par("rho_tail", rho_tail * urho, rho_tail);
 
-    print_par("rho_jet", rho_jet * urho);
-    print_par("sigma", sigma);
+    print_par("L_jet", L_jet * uE / uT, L_jet);
+    print_par("rho_jet", rho_jet * urho, rho_jet);
+    print_par("sigma_jet", sigma_jet, sigma_jet);
+    print_par("B_jet", B_jm * uB, B_jm);
+    print_par("p_jet", p_jet * uP, p_jet);
 
-    print_par("w", w);
-    print_par("eta", eta);
+    print_par("w", 1 + hydro_coef * p_jet / rho_jet + b2 / rho_jet, w);
+    print_par("eta", 1 + hydro_coef * p_jet / rho_jet, eta);
 
-    print_par("rho_wind", rho_wind * urho);
-    print_par("B_wind", B_wind * uB);
-    print_par("L_wind", L_wind * uE / uT);
-    print_par("E_wind", E_wind * uE);
-    print_par("L_jet", L_jet * uE / uT);
-    print_par("E_ej", E_ej * uE);
+    print_par("rho_wind", rho_wind * urho, rho_wind);
+    print_par("B_wind", B_wind * uB, B_wind);
+    print_par("L_wind", L_wind * uE / uT, L_wind);
+    print_par("E_wind", E_wind * uE, E_wind);
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -416,7 +432,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         }
 
         if (MAGNETIC_FIELDS_ENABLED) {
-            static std::atomic_bool radial_b = false;
+            static std::atomic_bool radial_b = ATOMIC_VAR_INIT(false);
 
             if (radial_b == false) {
                 for (int k = kl; k <= ku; ++k) {
