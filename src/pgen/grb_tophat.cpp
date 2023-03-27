@@ -438,7 +438,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int k = kl; k <= ku; ++k) {
                     for (int j = jl; j <= ju; ++j) {
                         for (int i = il - ngh; i <= iu + ngh; ++i) {
-                            b.x1f(k, j, i) = B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i);
+                            b.x1f(k, j, i) += B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i);
                         }
                     }
                 }
