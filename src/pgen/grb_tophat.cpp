@@ -200,7 +200,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     p_wind = k_wind * rho_wind;
 
-    B_wind = sqrt(B2_wind);
+    B_wind = sqrt(B2_wind / 2);
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 2 * PI * (0.5 + 3.0 / 8 * PI));
@@ -406,35 +406,34 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    /*Real theta = pcoord->x2v(j);
-                    Real sinx = sin(theta);
-                    Real v_phi = v_wind / sqrt(2);
-                    Real v_r = v_wind / sqrt(2);*/
                     prim(IDN, k, j, il - i) = rho_wind;
                     prim(IVX, k, j, il - i) = v_wind / sqrt(1 - v_wind * v_wind);
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = 0.0;
-                    //-v_phi / sqrt(1 - v_wind * v_wind) * sinx;
                     prim(IPR, k, j, il - i) = p_wind;
                 }
             }
         }
 
         if (MAGNETIC_FIELDS_ENABLED) {
+            static std::atomic_bool radial_b = false;
+
+            if (radial_b == false) {
+                for (int k = kl; k <= ku; ++k) {
+                    for (int j = jl; j <= ju; ++j) {
+                        for (int i = il - ngh; i <= iu + ngh; ++i) {
+                            b.x1f(k, j, i) = B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i);
+                        }
+                    }
+                }
+                radial_b = true;
+            }
+
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
-                    for (int i = il - ngh; i <= iu + ngh; ++i) {
-                        Real theta = pcoord->x2v(j);
-                        b.x1f(k, j, i) = B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i);
-                        // B_wind *rin *rin / pcoord->x1f(il - i) / pcoord->x1f(il - i);
+                    for (int i = 1; i <= ngh; ++i) {
+                        b.x1f(k, j, (il - i)) = -b.x1f(k, j, il + i - 1);
                     }
-                    /*for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = 0.0;
-                        // B_wind *rin *rin / pcoord->x1f(il - i) / pcoord->x1f(il - i);
-                    }*/
-                    /*for (int i = il - ngh; i <= iu; ++i) {
-                        b.x1f(k, j, i) = B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i) * 1.2247;
-                    }*/
                 }
             }
             for (int k = kl; k <= ku; ++k) {
