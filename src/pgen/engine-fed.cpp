@@ -419,7 +419,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         }
 
         if (MAGNETIC_FIELDS_ENABLED) {
-            static std::atomic_bool radial_b = ATOMIC_VAR_INIT(false);
+            static thread_local bool radial_b = false;
 
             if (radial_b == false) {
                 for (int k = kl; k <= ku; ++k) {

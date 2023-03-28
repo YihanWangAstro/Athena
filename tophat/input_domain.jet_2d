@@ -1,7 +1,7 @@
 <comment>
 problem   = spherical MHD blast wave in spherical coordinates
 reference = Gardiner. T.A. & Stone, J.M., JCP, 205, 509 (2005) (for MHD version of test)
-configure = `--prob=grb_clean --coord=spherical_polar -s -b  -omp -hdf5`
+configure = `--prob=engine-fed --coord=spherical_polar -s -b  -omp -hdf5`
 
 <job>
 problem_id = Jet      # problem ID: basename of output filenames
