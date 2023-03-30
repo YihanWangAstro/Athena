@@ -139,10 +139,15 @@ bool jet_on = true;
 // wind
 Real t_wind_launch = 0;
 Real t_wind_last = 10;
-Real B_wind = 0;
+Real k_wind = 1e-2;
+Real B_wind_r = 0;
+Real B_wind_phi = 0;
+Real B_star = 0;
+Real r_star = 1e6 / 3e10;
 Real rho_wind = 0;
-Real v_wind = 0.1;
-Real p_wind = 0;
+Real Omega = 100;
+Real R_lc = 0.001;
+// Real p_wind = 0;
 
 inline void print_par(std::string name, Real value, Real code_val) {
     std::cout << name << " = " << value << ',' << code_val << std::endl;
@@ -184,12 +189,37 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // reading parameters of wind
     t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 6);
     t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
-    Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
+    // Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
+    B_star = pin->GetOrAddReal("problem", "B_star", 100);
     Real sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 10);
-    Real k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-2);
+    Real T = pin->GetOrAddReal("problem", "T", 0.001);
+    k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-2);
 
     /// initializing variables
-    Real gamma_wind = 100;
+
+    Omega = 2 * PI / T;
+
+    R_lc = 1 / Omega;
+
+    Real gamma_wind_tp = sqrt(1 + rin * rin / R_lc / R_lc);
+
+    B_wind_r = B_star * r_star * r_star / (rin * rin);
+
+    B_wind_phi = B_star * r_star * r_star / (rin * rin) * (rin / R_lc);
+
+    Real v_wind_r = 1 / (1 + R_lc * R_lc / (rin * rin));
+
+    Real v_wind_phi = rin * Omega / (1 + rin * rin / (R_lc * R_lc));
+
+    Real b2_wind = (B_wind_r * B_wind_r + B_wind_phi * B_wind_phi) / (gamma_wind_tp * gamma_wind_tp) +
+                   (v_wind_phi * B_wind_phi + v_wind_r * B_wind_r) * (v_wind_phi * B_wind_phi + v_wind_r * B_wind_r);
+
+    rho_wind = b2_wind / (1 + hydro_coef * k_wind) / sigma_wind;
+
+    // B_wind = B_star * r_star * r_star / (rin * rin);
+
+    Real L_wind = 2 * B_star * B_star * r_star * r_star * r_star * r_star / R_lc / R_lc / 3;
+    /*Real gamma_wind = 100;
 
     v_wind = sqrt(1 - 1 / gamma_wind / gamma_wind);
 
@@ -204,7 +234,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     p_wind = k_wind * rho_wind;
 
-    B_wind = sqrt(B2_wind / 2);
+    B_wind = sqrt(B2_wind / 2);*/
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 4 * PI);
@@ -256,10 +286,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("w", 1 + hydro_coef * p_jet / rho_jet + b2 / rho_jet, w);
     print_par("eta", 1 + hydro_coef * p_jet / rho_jet, eta);
 
-    print_par("rho_wind", rho_wind * urho, rho_wind);
-    print_par("B_wind", B_wind * uB, B_wind);
+    print_par("rho_wind_eq", rho_wind * urho, rho_wind);
+    // print_par("B_wind", B_wind * uB, B_wind);
+    print_par("B_star", B_star * uB, B_star);
     print_par("L_wind", L_wind * uE / uT, L_wind);
-    print_par("E_wind", E_wind * uE, E_wind);
+    print_par("E_wind", L_wind * t_wind_last * uE, L_wind * t_wind_last);
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -361,7 +392,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
                         if (pcoord->x2v(j) < theta_jet) {
-                            b.x3f(k, j, (il - i)) = B_jm;
+                            b.x3f(k, j, (il - i)) = -B_jm;
                         } else {
                             b.x3f(k, j, (il - i)) = 0.0;
                         }
@@ -409,11 +440,15 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = rho_wind;
-                    prim(IVX, k, j, il - i) = v_wind / sqrt(1 - v_wind * v_wind);
+                    Real sin = std::sin(pcoord->x2v(j));
+                    Real R = pcoord->x1v(il - i) * sin;
+                    Real r_ratio = R_lc / R;
+                    Real gamma = sqrt(1 + 1 / (r_ratio * r_ratio));
+                    prim(IDN, k, j, il - i) = rho_wind * sin * sin;
+                    prim(IVX, k, j, il - i) = gamma / (1 + R_lc * R_lc / (R * R));
                     prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = 0.0;
-                    prim(IPR, k, j, il - i) = p_wind;
+                    prim(IVZ, k, j, il - i) = gamma * R * Omega / (1 + R * R / (R_lc * R_lc));
+                    prim(IPR, k, j, il - i) = prim(IDN, k, j, il - i) * k_wind;
                 }
             }
         }
@@ -425,7 +460,9 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int k = kl; k <= ku; ++k) {
                     for (int j = jl; j <= ju; ++j) {
                         for (int i = il - ngh; i <= iu + ngh; ++i) {
-                            b.x1f(k, j, i) += B_wind * rin * rin / pcoord->x1f(i) / pcoord->x1f(i);
+                            Real sin = std::sin(pcoord->x2v(j));
+                            b.x1f(k, j, i) += B_star * r_star * r_star / pcoord->x1f(i) / pcoord->x1f(i);
+                            b.x3f(k, j, i) -= B_star * r_star * r_star / pcoord->x1f(i) / R_lc * sin;
                         }
                     }
                 }
@@ -435,7 +472,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = B_wind * rin * rin / pcoord->x1f(il - i) / pcoord->x1f(il - i);
+                        Real sin = std::sin(pcoord->x2v(j));
+                        b.x1f(k, j, (il - i)) = B_star * r_star * r_star / pcoord->x1f(il - i) / pcoord->x1f(il - i);
                     }
                 }
             }
@@ -449,10 +487,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku + 1; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        Real theta = pcoord->x2v(j);
-                        Real sinx = sin(theta);
-                        b.x3f(k, j, (il - i)) = -B_wind * sinx * rin / pcoord->x1f(il - i) *
-                                                1.2247;  // 1.2247 = sqrt(3/2) //B_wind is average value
+                        Real sin = std::sin(pcoord->x2v(j));
+                        b.x3f(k, j, (il - i)) = -B_star * r_star * r_star / pcoord->x1f(il - i) / R_lc * sin;
                     }
                 }
             }
