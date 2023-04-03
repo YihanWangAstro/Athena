@@ -287,6 +287,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("eta", 1 + hydro_coef * p_jet / rho_jet, eta);
 
     print_par("rho_wind_eq", rho_wind * urho, rho_wind);
+    print_par("Gamma_wind", gamma_wind_tp, gamma_wind_tp);
     // print_par("B_wind", B_wind * uB, B_wind);
     print_par("B_star", B_star * uB, B_star);
     print_par("L_wind", L_wind * uE / uT, L_wind);
@@ -299,6 +300,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
+    Real r_ej_out = rho_tail > rho_amb ? r_c * pow(rho_tail / rho_amb, tail_n) : r_c;
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
@@ -312,7 +314,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                         rho = rho_ej * pow(r / r_c, -2);
                         v = v_ej * r / r_c;
                         p = k_ej * pow(rho, gamma_hydro);
-                    } else if (r < 4 * r_c) {
+                    } else if (r < r_ej_out && r >= r_c) {
                         rho = rho_tail * pow(r / r_c, -tail_n);
                         v = v_ej;
                         p = k_ej * pow(rho, gamma_hydro);
@@ -442,13 +444,12 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin = std::sin(pcoord->x2v(j));
                     Real R = pcoord->x1v(il - i) * sin;
-                    Real r_ratio = R_lc / R;
-                    Real gamma = sqrt(1 + 1 / (r_ratio * r_ratio));
-                    prim(IDN, k, j, il - i) = rho_wind * sin * sin;
+                    Real gamma = sqrt(1 + R * R / (R_lc * R_lc));
+                    prim(IDN, k, j, il - i) = rho_wind;
                     prim(IVX, k, j, il - i) = gamma / (1 + R_lc * R_lc / (R * R));
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = gamma * R * Omega / (1 + R * R / (R_lc * R_lc));
-                    prim(IPR, k, j, il - i) = prim(IDN, k, j, il - i) * k_wind;
+                    prim(IPR, k, j, il - i) = rho_wind * k_wind;
                 }
             }
         }
@@ -472,7 +473,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
-                        Real sin = std::sin(pcoord->x2v(j));
+                        // Real sin = std::sin(pcoord->x2v(j));
                         b.x1f(k, j, (il - i)) = B_star * r_star * r_star / pcoord->x1f(il - i) / pcoord->x1f(il - i);
                     }
                 }

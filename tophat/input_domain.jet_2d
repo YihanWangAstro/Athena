@@ -9,7 +9,7 @@ problem_id = Jet      # problem ID: basename of output filenames
 <output1>
 file_type  = hdf5        # Binary data dump
 variable   = prim,cons       # variables to be output
-dt         = 1e-2  # time increment between outputs
+dt         = 1e-3  # time increment between outputs
 
 <output2>
 file_type  = rst        # Binary data dump
@@ -58,12 +58,12 @@ pfloor = 1e-21
 gamma_max=1000
 
 <problem>   
-jet_on = 1
+jet_on = 0
 r_in = 1e-2
-p_amb = 1.35e-15
-rho_amb = 1.35e-6 
+p_amb = 1.35e-17
+rho_amb = 1.35e-8 
 
-ej_on = 1
+ej_on = 0
 k_ej = 1e-7
 M_ej = 0.01
 r_c = 0.04333333
@@ -78,7 +78,7 @@ L_jet = 2.78e-3
 sigma_jet = 10
 #B_jm = 1.1
 
-t_wind_launch = 1
+t_wind_launch = 0
 t_wind_last = 1
 ##E_wind = 5.5555555e-4
 sigma_wind = 10
