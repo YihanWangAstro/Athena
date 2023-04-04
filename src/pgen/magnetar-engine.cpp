@@ -293,6 +293,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("B_star", B_star * uB, B_star);
     print_par("L_wind", L_wind * uE / uT, L_wind);
     print_par("E_wind", L_wind * t_wind_last * uE, L_wind * t_wind_last);
+    print_par("sigma_amb", B_star * r_star * r_star / rin / rin / rho_amb, 1);
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -305,6 +306,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
+                Real Br = B_star * r_star * r_star / pcoord->x1v(i) / pcoord->x1v(i);
                 if (ej_on) {
                     Real r = pcoord->x1f(i);
                     Real sin_theta = std::sin(pcoord->x2v(j));
@@ -325,6 +327,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                         p = p_amb;
                     }
                     Real g = 1.0 / sqrt(1 - v * v);
+
                     phydro->u(IDN, k, j, i) = g * rho;
                     phydro->u(IM1, k, j, i) = g * g * (rho + hydro_coef * p) * v;
                     phydro->u(IM2, k, j, i) = 0.0;
@@ -335,7 +338,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     phydro->u(IM1, k, j, i) = 0.0;
                     phydro->u(IM2, k, j, i) = 0.0;
                     phydro->u(IM3, k, j, i) = 0.0;
-                    phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb) - p_amb;
+                    phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb + Br * Br) - p_amb - Br * Br / 2;
                 }
             }
         }
@@ -344,7 +347,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         for (int k = ks; k <= ke; ++k) {
             for (int j = js; j <= je; ++j) {
                 for (int i = is; i <= ie + 1; ++i) {
-                    pfield->b.x1f(k, j, i) = 0.0;
+                    pfield->b.x1f(k, j, i) = B_star * r_star * r_star / pcoord->x1f(i) / pcoord->x1f(i);
                 }
             }
         }
@@ -374,115 +377,28 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         exit(0);
     }
 
-    if (jet_on && time < t_jet_duration) {
-        // std::cout << "jet launch t= " << time << "\n";
-        if (MAGNETIC_FIELDS_ENABLED) {
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = 0.0;
-                    }
-                }
-            }
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju + 1; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x2f(k, j, (il - i)) = 0.0;
-                    }
-                }
-            }
-            for (int k = kl; k <= ku + 1; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        if (pcoord->x2v(j) < theta_jet) {
-                            b.x3f(k, j, (il - i)) = -B_jm;
-                        } else {
-                            b.x3f(k, j, (il - i)) = 0.0;
-                        }
-                    }
-                }
-            }
-        }
-
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = ju; j >= jl; --j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    if (pcoord->x2v(j) < theta_jet) {
-                        Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);
-                        prim(IDN, k, j, il - i) = rho_jet;
-                        prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
-                        prim(IVY, k, j, il - i) = 0.0;
-                        prim(IVZ, k, j, il - i) = 0;
-                        prim(IPR, k, j, il - i) = p_jet;
-                    } else {
-                        prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
-                        prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
-                        prim(IVY, k, j, il - i) = prim(IVY, k, j, il + i - 1);
-                        prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il + i - 1);
-                        prim(IPR, k, j, il - i) = prim(IPR, k, j, il + i - 1);
-                    }
-                }
-            }
-        }
-    } else if (time < t_wind_launch) {
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
-                    prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il + i - 1);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il + i - 1);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il + i - 1);
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_REFLECTING
-        }
-    } else if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
-        Real Omega_t = Omega * (time - t_wind_launch) + Omega * 0.1;
-        Real R_lct = 1 / Omega_t;
+    if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin = std::sin(pcoord->x2v(j));
                     Real R = pcoord->x1v(il - i) * sin;
-                    Real gamma = sqrt(1 + R * R / (R_lct * R_lct));
-                    Real vr = 1 / (1 + R_lct * R_lct / (R * R));
-                    Real vphi = R * Omega_t / (1 + R * R / (R_lct * R_lct));
-                    Real Br = B_star * r_star * r_star / pcoord->x1v(il - i) / pcoord->x1v(il - i);
-                    Real Bphi = B_star * r_star * r_star / pcoord->x1v(il - i) / R_lct * sin;
-                    Real b2 =
-                        (Br * Br + Bphi * Bphi) / gamma / gamma + (vr * Br + vphi * Bphi) * (vr * Br + vphi * Bphi);
-                    Real rho = b2 / sigma_wind;
-                    prim(IDN, k, j, il - i) = rho_wind;
-                    prim(IVX, k, j, il - i) = gamma / (1 + R_lct * R_lct / (R * R));
-                    prim(IVY, k, j, il - i) = 0.0;
-                    prim(IVZ, k, j, il - i) = gamma * R * Omega_t / (1 + R * R / (R_lct * R_lct));
-                    prim(IPR, k, j, il - i) = k_wind * pow(rho_wind, gamma_hydro);
-                    // std::cout << rho << ' ' << prim(IPR, k, j, il - i) / rho << '\n';
+                    Real vphi = Omega * R;
+                    Real gamma = 1.0 / sqrt(1 - vphi * vphi);
+                    // Real Br = B_star * r_star * r_star / pcoord->x1v(il - i) / pcoord->x1v(il - i);
+                    // Real rho = Br * Br / gamma / gamma / sigma_wind;
+                    prim(IDN, k, j, il - i) = rho_amb;
+                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
+                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
+                    prim(IVZ, k, j, il - i) = gamma * vphi;
+                    prim(IPR, k, j, il - i) = p_amb;
                 }
             }
         }
+        SET_MAGNETIC_FIELD_BC_OUTFLOW
+
         // exit(0);
-        if (MAGNETIC_FIELDS_ENABLED) {
-            static thread_local bool radial_b = false;
-
-            if (radial_b == false) {
-                for (int k = kl; k <= ku; ++k) {
-                    for (int j = jl; j <= ju; ++j) {
-                        for (int i = il - ngh; i <= iu + ngh; ++i) {
-                            Real sin = std::sin(pcoord->x2f(j));
-                            b.x1f(k, j, i) = B_star * r_star * r_star / pcoord->x1f(i) / pcoord->x1f(i);
-                            b.x2f(k, j, i) = 0.0;
-                            b.x3f(k, j, i) = 0.0;
-                            //-B_star *r_star *r_star / pcoord->x1f(i) / R_lct *sin;
-                        }
-                    }
-                }
-                radial_b = true;
-            }
-
+        /*if (MAGNETIC_FIELDS_ENABLED) {
             for (int k = kl; k <= ku; ++k) {
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
@@ -501,25 +417,10 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 for (int j = jl; j <= ju; ++j) {
                     for (int i = 1; i <= ngh; ++i) {
                         Real sin = std::sin(pcoord->x2f(j));
-                        b.x3f(k, j, (il - i)) = -B_star * r_star * r_star / pcoord->x1f(il - i) / R_lct * sin;
+                        b.x3f(k, j, (il - i)) = 0.0;
                     }
                 }
             }
-        }
-    } else if (time > (t_wind_launch + t_wind_last)) {
-        for (int k = kl; k <= ku; ++k) {
-            for (int j = jl; j <= ju; ++j) {
-                for (int i = 1; i <= ngh; ++i) {
-                    prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
-                    prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il + i - 1);
-                    prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il + i - 1);
-                    prim(IPR, k, j, il - i) = prim(IPR, k, j, il + i - 1);
-                }
-            }
-        }
-        if (MAGNETIC_FIELDS_ENABLED) {
-            SET_MAGNETIC_FIELD_BC_OUTFLOW
-        }
+        }*/
     }
 }
