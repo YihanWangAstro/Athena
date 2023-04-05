@@ -351,16 +351,10 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     Real sin = std::sin(pcoord->x2v(j));
                     Real R = pcoord->x1v(il - i) * sin;
                     Real vphi = Omega * R;
-                    /*Real u_r_out = prim(IVX, k, j, il);
-                    Real u_theta_out = prim(IVY, k, j, il);
-                    Real u_phi_out = prim(IVZ, k, j, il);
-                    Real gamma_out2 = (1 + u_r_out * u_r_out + u_theta_out * u_theta_out + u_phi_out * u_phi_out);
-                    Real gamma_in = 1.0 / sqrt(1 - vphi * vphi - u_r_out * u_r_out / gamma_out2 -
-                                               u_theta_out * u_theta_out / gamma_out2);*/
                     Real gamma_in = 1.0 / sqrt(1 - vphi * vphi);
                     prim(IDN, k, j, il - i) = rho_amb;
-                    prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
-                    prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
+                    prim(IVX, k, j, il - i) = 0.0;
+                    prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = gamma_in * vphi;
                     prim(IPR, k, j, il - i) = p_amb;
                 }
