@@ -149,6 +149,7 @@ Real Omega = 100;
 Real R_lc = 0.001;
 Real sigma_wind = 10;
 // Real p_wind = 0;
+Real monopole_dist = 0;
 
 inline void print_par(std::string name, Real value, Real code_val) {
     std::cout << name << " = " << value << ',' << code_val << std::endl;
@@ -194,6 +195,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     B_star = pin->GetOrAddReal("problem", "B_star", 100);
     sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 10);
     Real T = pin->GetOrAddReal("problem", "T", 0.001);
+    monopole_dist = pin->GetOrAddReal("problem", "monopole_dist", 0);
     k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
 
     /// initializing variables
@@ -220,22 +222,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // B_wind = B_star * r_star * r_star / (rin * rin);
 
     Real L_wind = 2 * B_star * B_star * r_star * r_star * r_star * r_star / R_lc / R_lc / 3;
-    /*Real gamma_wind = 100;
-
-    v_wind = sqrt(1 - 1 / gamma_wind / gamma_wind);
-
-    Real L_wind = E_wind / t_wind_last;
-
-    Real e_wind = L_wind / (4 * PI * rin * rin * v_wind);
-
-    Real B2_wind = e_wind / (1 + 1 / sigma_wind - 1.0 / 2.0 / gamma_wind / gamma_wind -
-                             hydro_coef * k_wind / (hydro_coef * k_wind + 1) / gamma_wind / gamma_wind / sigma_wind);
-
-    rho_wind = B2_wind / gamma_wind / gamma_wind / sigma_wind / (hydro_coef * k_wind + 1);
-
-    p_wind = k_wind * rho_wind;
-
-    B_wind = sqrt(B2_wind / 2);*/
     // ejecta calculations
 
     rho_ej = M_ej / (r_c * r_c * r_c * 4 * PI);
@@ -302,73 +288,54 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-    Real r_ej_out = rho_tail > rho_amb ? r_c * pow(rho_tail / rho_amb, tail_n) : r_c;
-    for (int k = ks; k <= ke; k++) {
-        for (int j = js; j <= je; j++) {
-            for (int i = is; i <= ie; i++) {
-                Real Br = B_star * r_star * r_star / pcoord->x1v(i) / pcoord->x1v(i);
-                if (ej_on) {
-                    Real r = pcoord->x1f(i);
-                    Real sin_theta = std::sin(pcoord->x2v(j));
-                    Real v = 0;
-                    Real rho = 0;
-                    Real p = 0;
-                    if (r < r_c) {
-                        rho = rho_ej * pow(r / r_c, -2);
-                        v = v_ej * r / r_c;
-                        p = k_ej * pow(rho, gamma_hydro);
-                    } else if (r < r_ej_out && r >= r_c) {
-                        rho = rho_tail * pow(r / r_c, -tail_n);
-                        v = v_ej;
-                        p = k_ej * pow(rho, gamma_hydro);
-                    } else {
-                        rho = rho_amb;
-                        v = 0;
-                        p = p_amb;
-                    }
-                    Real g = 1.0 / sqrt(1 - v * v);
-
-                    phydro->u(IDN, k, j, i) = g * rho;
-                    phydro->u(IM1, k, j, i) = g * g * (rho + hydro_coef * p) * v;
-                    phydro->u(IM2, k, j, i) = 0.0;
-                    phydro->u(IM3, k, j, i) = 0.0;
-                    phydro->u(IEN, k, j, i) = g * g * (rho + hydro_coef * p) - p;
+    for (int k = ks; k <= ke; ++k) {
+        for (int j = js; j <= je; ++j) {
+            for (int i = is; i <= ie + 1; ++i) {
+                Real r = pcoord->x1f(i);
+                Real theta = pcoord->x2f(j);
+                if (monopole_dist < 0) {
+                    pfield->b.x1f(k, j, i) = B_star * r_star * r_star / r / r * sin(theta);
+                } else if (monopole_dist > 0) {
+                    pfield->b.x1f(k, j, i) = B_star * r_star * r_star / r / r * cos(theta);
                 } else {
-                    phydro->u(IDN, k, j, i) = rho_amb;
-                    phydro->u(IM1, k, j, i) = 0.0;
-                    phydro->u(IM2, k, j, i) = 0.0;
-                    phydro->u(IM3, k, j, i) = 0.0;
-                    phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb + Br * Br) - p_amb - Br * Br / 2;
+                    pfield->b.x1f(k, j, i) = B_star * r_star * r_star / r / r;
                 }
             }
         }
     }
-    if (MAGNETIC_FIELDS_ENABLED) {
-        for (int k = ks; k <= ke; ++k) {
-            for (int j = js; j <= je; ++j) {
-                for (int i = is; i <= ie + 1; ++i) {
-                    pfield->b.x1f(k, j, i) = B_star * r_star * r_star / pcoord->x1f(i) / pcoord->x1f(i);
-                }
+    for (int k = ks; k <= ke; ++k) {
+        for (int j = js; j <= je + 1; ++j) {
+            for (int i = is; i <= ie; ++i) {
+                Real r = pcoord->x1f(i);
+                Real theta = pcoord->x2f(j);
+                pfield->b.x2f(k, j, i) = 0.0;
             }
         }
-        for (int k = ks; k <= ke; ++k) {
-            for (int j = js; j <= je + 1; ++j) {
-                for (int i = is; i <= ie; ++i) {
-                    pfield->b.x2f(k, j, i) = 0.0;
-                }
+    }
+    for (int k = ks; k <= ke + 1; ++k) {
+        for (int j = js; j <= je; ++j) {
+            for (int i = is; i <= ie; ++i) {
+                pfield->b.x3f(k, j, i) = 0.0;
             }
         }
-        for (int k = ks; k <= ke + 1; ++k) {
-            for (int j = js; j <= je; ++j) {
-                for (int i = is; i <= ie; ++i) {
-                    pfield->b.x3f(k, j, i) = 0.0;
-                }
+    }
+
+    for (int k = ks; k <= ke; k++) {
+        for (int j = js; j <= je; j++) {
+            for (int i = is; i <= ie; i++) {
+                phydro->u(IDN, k, j, i) = rho_amb;
+                phydro->u(IM1, k, j, i) = 0.0;
+                phydro->u(IM2, k, j, i) = 0.0;
+                phydro->u(IM3, k, j, i) = 0.0;
+                phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb) - p_amb +
+                                          0.5 * (pfield->b.x1f(k, j, i) * pfield->b.x1f(k, j, i) +
+                                                 pfield->b.x2f(k, j, i) * pfield->b.x2f(k, j, i) +
+                                                 pfield->b.x3f(k, j, i) * pfield->b.x3f(k, j, i));
+                ;
             }
         }
     }
 }
-
-inline Real transit(Real t, Real t0, Real width) { return 1 / (1 + std::exp((t - t0) / width)); }
 
 void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, FaceField &b, Real time, Real dt, int il,
                  int iu, int jl, int ju, int kl, int ku, int ngh) {
@@ -384,43 +351,52 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     Real sin = std::sin(pcoord->x2v(j));
                     Real R = pcoord->x1v(il - i) * sin;
                     Real vphi = Omega * R;
-                    Real gamma = 1.0 / sqrt(1 - vphi * vphi);
-                    // Real Br = B_star * r_star * r_star / pcoord->x1v(il - i) / pcoord->x1v(il - i);
-                    // Real rho = Br * Br / gamma / gamma / sigma_wind;
+                    /*Real u_r_out = prim(IVX, k, j, il);
+                    Real u_theta_out = prim(IVY, k, j, il);
+                    Real u_phi_out = prim(IVZ, k, j, il);
+                    Real gamma_out2 = (1 + u_r_out * u_r_out + u_theta_out * u_theta_out + u_phi_out * u_phi_out);
+                    Real gamma_in = 1.0 / sqrt(1 - vphi * vphi - u_r_out * u_r_out / gamma_out2 -
+                                               u_theta_out * u_theta_out / gamma_out2);*/
+                    Real gamma_in = 1.0 / sqrt(1 - vphi * vphi);
                     prim(IDN, k, j, il - i) = rho_amb;
                     prim(IVX, k, j, il - i) = prim(IVX, k, j, il);
                     prim(IVY, k, j, il - i) = prim(IVY, k, j, il);
-                    prim(IVZ, k, j, il - i) = gamma * vphi;
+                    prim(IVZ, k, j, il - i) = gamma_in * vphi;
                     prim(IPR, k, j, il - i) = p_amb;
                 }
             }
         }
-        SET_MAGNETIC_FIELD_BC_OUTFLOW
-
-        // exit(0);
-        /*if (MAGNETIC_FIELDS_ENABLED) {
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x1f(k, j, (il - i)) = B_star * r_star * r_star / pcoord->x1f(il - i) / pcoord->x1f(il - i);
+        // SET_MAGNETIC_FIELD_BC_OUTFLOW
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    Real r = pcoord->x1f(il - i);
+                    Real theta = pcoord->x2f(j);
+                    if (monopole_dist < 0) {
+                        b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r * sin(theta);
+                    } else if (monopole_dist > 0) {
+                        b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r * cos(theta);
+                    } else {
+                        b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r;
                     }
                 }
             }
-            for (int k = kl; k <= ku; ++k) {
-                for (int j = jl; j <= ju + 1; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        b.x2f(k, j, (il - i)) = 0.0;
-                    }
+        }
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju + 1; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    Real r = pcoord->x1f(il - i);
+                    Real theta = pcoord->x2f(j);
+                    b.x2f(k, j, (il - i)) = 0.0;
                 }
             }
-            for (int k = kl; k <= ku + 1; ++k) {
-                for (int j = jl; j <= ju; ++j) {
-                    for (int i = 1; i <= ngh; ++i) {
-                        Real sin = std::sin(pcoord->x2f(j));
-                        b.x3f(k, j, (il - i)) = 0.0;
-                    }
+        }
+        for (int k = kl; k <= ku + 1; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    b.x3f(k, j, (il - i)) = 0.0;
                 }
             }
-        }*/
+        }
     }
 }
