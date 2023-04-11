@@ -326,7 +326,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         std::cout << "use sphereical coordinate" << std::endl;
         exit(0);
     }
-    if (jet_on && time < t_jet_duration) {
+    if (time < t_jet_duration) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
@@ -344,7 +344,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku + 1; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    if (pcoord->x2v(j) < theta_jet) {
+                    if (jet_on && (pcoord->x2v(j) < theta_jet)) {
                         b.x3f(k, j, (il - i)) = -B_jm;
                     } else {
                         b.x3f(k, j, (il - i)) = 0.0;
@@ -357,7 +357,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int j = ju; j >= jl; --j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real theta = pcoord->x2v(j);
-                    if (theta < theta_jet) {
+                    if (jet_on && (theta < theta_jet)) {
                         Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);
                         prim(IDN, k, j, il - i) = rho_jet;
                         prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
