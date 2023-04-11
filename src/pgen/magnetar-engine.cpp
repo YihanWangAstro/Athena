@@ -121,10 +121,9 @@ Real rin = 1.666666e-3;
 // ejetcta
 Real v_ej = 0.2;
 Real rho_ej = 0;
-Real rho_tail = 0;
 Real k_ej = 1e-6;
 Real r_c = 0.04333333;
-Real tail_n = 8;
+// Real r_ej_in = r_c / 10;
 bool ej_on = true;
 
 // jet
@@ -139,12 +138,13 @@ bool jet_on = true;
 Real t_wind_launch = 0;
 Real t_wind_last = 10;
 Real B_star = 0;
-Real r_star = 1e6 / 3e10;
+Real r_star = 1.2e6 / 3e10;
 Real rho_wind = 0;
 Real Omega = 100;
 Real p_wind = 0;
 Real monopole_dist = 0;
-
+Real k_wind = 1e-6;
+Real sigma_wind = 100;
 inline void print_par(std::string name, Real value, Real code_val) {
     std::cout << name << " = " << value << ',' << code_val << std::endl;
 }
@@ -167,7 +167,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-7);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
-    r_c = pin->GetOrAddReal("problem", "r_c", 0.043333);
+    Real t_d = pin->GetOrAddReal("problem", "t_d", 0.5);
 
     // reading parameters of jet
     jet_on = pin->GetBoolean("problem", "jet_on");
@@ -183,10 +183,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
     // Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
     B_star = pin->GetOrAddReal("problem", "B_star", 100);
-    Real sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 10);
+    sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1000);
     Real T = pin->GetOrAddReal("problem", "T", 0.001);
     monopole_dist = pin->GetOrAddReal("problem", "monopole_dist", 0);
-    Real k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
+    k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
 
     /// initializing variables
     Omega = 2 * PI / T;
@@ -200,10 +200,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real L_wind = 2 * B_star * B_star * r_star * r_star * r_star * r_star * Omega * Omega / 3;
     // ejecta calculations
 
-    rho_ej = M_ej / (r_c * r_c * r_c * 4 * PI);
+    r_c = t_d * v_ej;
 
-    rho_tail = 0.01 * M_ej / (4 * PI * r_c * r_c * r_c * (pow(4, 3 - tail_n) - 1) / (3 - tail_n));
+    // Real v_ej_esc = 0.024 * pow(t_d, -1.0 / 3);  // 0.024c is the escape velocity of t_d = 1sec with M_ns = 1.4Msun
 
+    // r_ej_in = v_ej_esc * t_d;
+
+    rho_ej = M_ej / (r_c * r_c * 2 * PI * (0.5 + 3 * PI / 8) * (r_c - rin));
     // Real E_ej = 0.5 * rho_ej * v_ej * v_ej * 4 * PI * r_c * r_c * r_c / 3;
     // jet calculations
 
@@ -234,7 +237,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     // print_par("E_ej", E_ej * uE, E_ej);
 
     print_par("rho_ej", rho_ej * urho, rho_ej);
-    print_par("rho_tail", rho_tail * urho, rho_tail);
+    print_par("rho_ej_inner", rho_ej * r_c * r_c / rin / rin * urho, rho_ej * r_c * r_c / rin / rin);
     print_par("rho_jet", rho_jet * urho, rho_jet);
     print_par("rho_wind", rho_wind * urho, rho_wind);
 
@@ -271,11 +274,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     if (r < r_c) {
                         rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
                         v = v_ej * r / r_c;
-                        p = k_ej * pow(rho, gamma_hydro);
-                    } else if (r < 4 * r_c) {
-                        rho = rho_tail * pow(r / r_c, -tail_n);
-                        v = v_ej;
-                        p = k_ej * pow(rho, gamma_hydro);
+                        p = k_ej * rho;
                     } else {
                         rho = rho_amb;
                         v = 0;
@@ -346,7 +345,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     if (pcoord->x2v(j) < theta_jet) {
-                        b.x3f(k, j, (il - i)) = B_jm;
+                        b.x3f(k, j, (il - i)) = -B_jm;
                     } else {
                         b.x3f(k, j, (il - i)) = 0.0;
                     }
@@ -357,7 +356,8 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku; ++k) {
             for (int j = ju; j >= jl; --j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    if (pcoord->x2v(j) < theta_jet) {
+                    Real theta = pcoord->x2v(j);
+                    if (theta < theta_jet) {
                         Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);
                         prim(IDN, k, j, il - i) = rho_jet;
                         prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
@@ -365,11 +365,15 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                         prim(IVZ, k, j, il - i) = 0.0;
                         prim(IPR, k, j, il - i) = p_jet;
                     } else {
-                        prim(IDN, k, j, il - i) = prim(IDN, k, j, il + i - 1);
-                        prim(IVX, k, j, il - i) = -prim(IVX, k, j, il + i - 1);
-                        prim(IVY, k, j, il - i) = prim(IVY, k, j, il + i - 1);
-                        prim(IVZ, k, j, il - i) = prim(IVZ, k, j, il + i - 1);
-                        prim(IPR, k, j, il - i) = prim(IPR, k, j, il + i - 1);
+                        Real sin_theta = sin(theta);
+                        Real r = pcoord->x1v(il - i);
+                        Real rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
+                        Real v_r = v_ej * r / r_c;
+                        prim(IDN, k, j, il - i) = rho;
+                        prim(IVX, k, j, il - i) = v_r / sqrt(1 - v_r * v_r);
+                        prim(IVY, k, j, il - i) = 0;
+                        prim(IVZ, k, j, il - i) = 0;
+                        prim(IPR, k, j, il - i) = k_ej * rho;
                     }
                 }
             }
@@ -405,15 +409,39 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
         }
-        // SET_MAGNETIC_FIELD_BC_OUTFLOW
+
+        static bool set_radial = false;
+#pragma omp threadprivate(set_radial)
+        if (set_radial == false) {
+            for (int k = kl; k <= ku; ++k) {
+                for (int j = jl; j <= ju; ++j) {
+                    for (int i = il; i <= iu + 1; ++i) {
+                        Real r = pcoord->x1f(i);
+                        if (monopole_dist < 0) {
+                            Real theta = pcoord->x2f(j);
+                            b.x1f(k, j, i) = B_star * r_star * r_star / r / r * sin(theta);
+                        } else if (monopole_dist > 0) {
+                            Real theta = pcoord->x2f(j);
+                            b.x1f(k, j, i) = B_star * r_star * r_star / r / r * cos(theta);
+                        } else {
+                            b.x1f(k, j, i) = B_star * r_star * r_star / r / r;
+                        }
+                    }
+                }
+            }
+            set_radial = true;
+            std::cout << "set radial field" << time << std::endl;
+        }
+
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real r = pcoord->x1f(il - i);
-                    Real theta = pcoord->x2f(j);
                     if (monopole_dist < 0) {
+                        Real theta = pcoord->x2f(j);
                         b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r * sin(theta);
                     } else if (monopole_dist > 0) {
+                        Real theta = pcoord->x2f(j);
                         b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r * cos(theta);
                     } else {
                         b.x1f(k, j, (il - i)) = B_star * r_star * r_star / r / r;
@@ -421,15 +449,15 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
         }
+
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju + 1; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    Real r = pcoord->x1f(il - i);
-                    Real theta = pcoord->x2f(j);
                     b.x2f(k, j, (il - i)) = 0.0;
                 }
             }
         }
+
         for (int k = kl; k <= ku + 1; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
