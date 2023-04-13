@@ -121,9 +121,7 @@ Real rin = 1.666666e-3;
 // ejetcta
 Real v_ej = 0.2;
 Real rho_ej = 0;
-Real k_ej = 1e-6;
 Real r_c = 0.04333333;
-// Real r_ej_in = r_c / 10;
 bool ej_on = true;
 
 // jet
@@ -141,20 +139,16 @@ Real B_star = 0;
 Real r_star = 1.2e6 / 3e10;
 Real rho_wind = 0;
 Real Omega = 100;
-Real p_wind = 0;
 Real monopole_dist = 0;
-Real k_wind = 1e-6;
 Real sigma_wind = 100;
 inline void print_par(std::string name, Real value, Real code_val) {
     std::cout << name << " = " << value << ',' << code_val << std::endl;
 }
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
-    // reading model parameters
-
-    // reading coordinates
     rin = pin->GetOrAddReal("problem", "r_in", 1.6666666666e-3);
-    // reading hydro paramters
+    // rin = pcoord->x1v(is);
+    //  reading hydro paramters
     gamma_hydro = pin->GetOrAddReal("hydro", "gamma", 1.33333333);
     hydro_coef = gamma_hydro / (gamma_hydro - 1);
 
@@ -164,7 +158,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     // reading parameters of ejecta
     ej_on = pin->GetBoolean("problem", "ej_on");
-    k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-7);
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
     Real t_d = pin->GetOrAddReal("problem", "t_d", 0.5);
@@ -186,7 +179,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1000);
     Real T = pin->GetOrAddReal("problem", "T", 0.001);
     monopole_dist = pin->GetOrAddReal("problem", "monopole_dist", 0);
-    k_wind = pin->GetOrAddReal("problem", "k_wind", 1e-6);
 
     /// initializing variables
     Omega = 2 * PI / T;
@@ -194,8 +186,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real B_in = B_star * r_star * r_star / rin / rin;
 
     rho_wind = B_in * B_in / sigma_wind;
-
-    p_wind = rho_wind * k_wind;
 
     Real L_wind = 2 * B_star * B_star * r_star * r_star * r_star * r_star * Omega * Omega / 3;
     // ejecta calculations
@@ -262,23 +252,22 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
+    //----------------------------------------------------------------------------------------------
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
                 if (ej_on) {
-                    Real r = pcoord->x1f(i);
+                    Real r = pcoord->x1v(i);
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     Real v = 0;
                     Real rho = 0;
-                    Real p = 0;
+                    Real p = p_amb;
                     if (r < r_c) {
                         rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
                         v = v_ej * r / r_c;
-                        p = k_ej * rho;
                     } else {
                         rho = rho_amb;
                         v = 0;
-                        p = p_amb;
                     }
                     Real g = 1.0 / sqrt(1 - v * v);
                     phydro->u(IDN, k, j, i) = g * rho;
@@ -326,6 +315,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         std::cout << "use sphereical coordinate" << std::endl;
         exit(0);
     }
+    Real Rlc = 1 / Omega;
     if (time < t_jet_duration) {
         for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
@@ -344,7 +334,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku + 1; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
-                    if (jet_on && (pcoord->x2v(j) < theta_jet)) {
+                    if (jet_on && (pcoord->x2v(j) < theta_jet || pcoord->x2v(j) > (PI - theta_jet))) {
                         b.x3f(k, j, (il - i)) = -B_jm;
                     } else {
                         b.x3f(k, j, (il - i)) = 0.0;
@@ -357,7 +347,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int j = ju; j >= jl; --j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real theta = pcoord->x2v(j);
-                    if (jet_on && (theta < theta_jet)) {
+                    if (jet_on && (theta < theta_jet || theta > (PI - theta_jet))) {
                         Real gamma_jet = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);
                         prim(IDN, k, j, il - i) = rho_jet;
                         prim(IVX, k, j, il - i) = gamma_jet * v_jet_r;
@@ -373,7 +363,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                         prim(IVX, k, j, il - i) = v_r / sqrt(1 - v_r * v_r);
                         prim(IVY, k, j, il - i) = 0;
                         prim(IVZ, k, j, il - i) = 0;
-                        prim(IPR, k, j, il - i) = k_ej * rho;
+                        prim(IPR, k, j, il - i) = p_amb;
                     }
                 }
             }
@@ -394,7 +384,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             SET_MAGNETIC_FIELD_BC_REFLECTING  // avoid continuous poynting flux
         }
     } else if ((time >= t_wind_launch) && (time <= (t_wind_launch + t_wind_last))) {
-        for (int k = kl; k <= ku; ++k) {
+        /*for (int k = kl; k <= ku; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     Real sin = std::sin(pcoord->x2v(j));
@@ -406,6 +396,39 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     prim(IVY, k, j, il - i) = 0.0;
                     prim(IVZ, k, j, il - i) = gamma_in * vphi;
                     prim(IPR, k, j, il - i) = p_wind;
+                }
+            }
+        }*/
+
+        /*for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    Real sin = std::sin(pcoord->x2v(j));
+                    Real R = pcoord->x1v(il - i) * sin;
+                    Real vphi = Omega * R / (1 + R * R / (Rlc * Rlc));
+                    Real vr = 1 / (1 + Rlc * Rlc / (R * R));
+                    Real gamma = 1.0 / sqrt(1 - vphi * vphi - vr * vr);
+                    prim(IDN, k, j, il - i) = rho_wind;
+                    prim(IVX, k, j, il - i) = gamma * vr;
+                    prim(IVY, k, j, il - i) = 0.0;
+                    prim(IVZ, k, j, il - i) = gamma * vphi;
+                    prim(IPR, k, j, il - i) = p_amb;
+                }
+            }
+        }*/
+
+        for (int k = kl; k <= ku; ++k) {
+            for (int j = jl; j <= ju; ++j) {
+                for (int i = 1; i <= ngh; ++i) {
+                    Real sin = std::sin(pcoord->x2v(j));
+                    Real R = pcoord->x1v(il - 1) * sin;
+                    Real vphi = Omega * R;
+                    Real gamma = 1.0 / sqrt(1 - vphi * vphi);
+                    prim(IDN, k, j, il - i) = rho_amb;
+                    prim(IVX, k, j, il - i) = 0.0;
+                    prim(IVY, k, j, il - i) = 0.0;
+                    prim(IVZ, k, j, il - i) = gamma * vphi;
+                    prim(IPR, k, j, il - i) = p_amb;
                 }
             }
         }
@@ -430,7 +453,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 }
             }
             set_radial = true;
-            std::cout << "set radial field" << time << std::endl;
+            std::cout << "set radial field " << time << std::endl;
         }
 
         for (int k = kl; k <= ku; ++k) {
@@ -461,6 +484,9 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int k = kl; k <= ku + 1; ++k) {
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
+                    // Real r = pcoord->x1f(il);
+                    // Real theta = pcoord->x2f(j);
+                    //  b.x3f(k, j, (il - i)) = -B_star * r_star * r_star / r / Rlc * sin(theta);
                     b.x3f(k, j, (il - i)) = 0.0;
                 }
             }
