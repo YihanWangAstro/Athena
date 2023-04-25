@@ -216,6 +216,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real eta = w / (sigma_jet + 1);
 
+    if (sigma_jet > 1) {
+        eta = w * (1 + pow(sigma_jet, 2.0 / 3.0)) / (sigma_jet + 1);
+    }
+
+    Real eta = w / sigma_jet;
+
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
 
     rho_jet = e_jet / (gamma_jet_r * gamma_jet_r * w - 0.5 * w / (1 + 1 / sigma_jet) - (eta - 1) / hydro_coef);
