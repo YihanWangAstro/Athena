@@ -126,6 +126,7 @@ bool jet_on = true;
 // wind
 Real t_wind_launch = 0;
 Real t_wind_last = 10;
+Real B_star = 0;
 
 Real r_star = 1.2e6 / 3e10;
 Real sigma_wind = 100;
@@ -154,6 +155,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
     Real t_d = pin->GetOrAddReal("problem", "t_d", 0.5);
+    k_ej = pin->GetOrAddReal("problem", "k_ej", 1e-5);
 
     // reading parameters of jet
     jet_on = pin->GetBoolean("problem", "jet_on");
@@ -168,7 +170,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     t_wind_launch = pin->GetOrAddReal("problem", "t_wind_launch", 6);
     t_wind_last = pin->GetOrAddReal("problem", "t_wind_last", 10);
     // Real E_wind = pin->GetOrAddReal("problem", "E_wind", 6.66666e-6);
-    Real B_star = pin->GetOrAddReal("problem", "B_star", 100);
+    B_star = pin->GetOrAddReal("problem", "B_star", 100);
     sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1000);
     gamma_wind = pin->GetOrAddReal("problem", "gamma_wind", 100);
     Real T = pin->GetOrAddReal("problem", "T", 0.001);
@@ -202,8 +204,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     Real gamma_jet_r = 1.0 / sqrt(1.0 - v_jet_r * v_jet_r);  // gamma in radial direction
 
     // Real w = Gamma_inf / gamma_jet_r;
+    // Real gamma_jet_r = rin / 0.001666666666666666 * gamma_jet_r0;
+    // v_jet_r = sqrt(1 - 1 / (gamma_jet_r * gamma_jet_r));
 
-    Real eta = Gamma_inf / pow(sigma_jet + 1, 1.0 / 3);
+    Real eta = Gamma_inf / pow(sigma_jet + 1, 1.0);
 
     Real e_jet = L_jet / (v_jet_r * rin * rin * 4 * PI);  // isotropic energy
 
@@ -259,8 +263,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
+                Real r = pcoord->x1v(i);
+                Real Br = 0.0;
+                // B_star *r_star *r_star / r / r;
                 if (ej_on) {
-                    Real r = pcoord->x1v(i);
                     Real sin_theta = std::sin(pcoord->x2v(j));
                     Real v = 0;
                     Real rho = 0;
@@ -280,15 +286,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     phydro->u(IM3, k, j, i) = 0.0;
                     phydro->u(IEN, k, j, i) = g * g * (rho + hydro_coef * p) - p;
                 } else {
-                    Real r = pcoord->x1v(i);
-                    // Real Br = Br_on * B_star * r_star * r_star / r / r;
                     phydro->u(IDN, k, j, i) = rho_amb;
                     phydro->u(IM1, k, j, i) = 0.0;
                     phydro->u(IM2, k, j, i) = 0.0;
                     phydro->u(IM3, k, j, i) = 0.0;
                     phydro->u(IEN, k, j, i) = (rho_amb + hydro_coef * p_amb) - p_amb;
-                    //+Br *Br * 0.5;
                 }
+                phydro->u(IEN, k, j, i) += 0.5 * Br * Br;
             }
         }
     }
@@ -297,7 +301,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         for (int j = js; j <= je; ++j) {
             for (int i = is; i <= ie + 1; ++i) {
                 pfield->b.x1f(k, j, i) = 0.0;
-                // Br_on *B_star *r_star *r_star / pcoord->x1f(i) / pcoord->x1f(i);
+                // B_star *r_star *r_star / pcoord->x1f(i) / pcoord->x1f(i);
             }
         }
     }
@@ -329,6 +333,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
             for (int j = jl; j <= ju; ++j) {
                 for (int i = 1; i <= ngh; ++i) {
                     b.x1f(k, j, (il - i)) = 0.0;
+                    // B_star *r_star *r_star / pcoord->x1f(il - i) / pcoord->x1f(il - i);
                 }
             }
         }
