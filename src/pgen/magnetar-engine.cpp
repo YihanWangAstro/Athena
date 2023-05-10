@@ -114,6 +114,7 @@ Real rho_ej = 0;
 Real r_c = 0.04333333;
 Real k_ej = 1e-5;
 bool ej_on = true;
+bool ej_uniform = false;
 
 // jet
 Real theta_jet = 0.1;
@@ -152,6 +153,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     // reading parameters of ejecta
     ej_on = pin->GetBoolean("problem", "ej_on");
+    ej_uniform = pin->GetBoolean("problem", "ej_uniform");
     Real M_ej = pin->GetOrAddReal("problem", "M_ej", 0.01);
     v_ej = pin->GetOrAddReal("problem", "v_ej", 0.2);
     Real t_d = pin->GetOrAddReal("problem", "t_d", 0.5);
@@ -181,9 +183,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     Real Rlc = 1 / Omega;
 
-    Real L_sd = 2 * B_star * B_star * r_star * r_star * r_star * r_star * Omega * Omega / 3;  // spin down luminosity
+    Real L_sd =
+        2.0 / 3 * B_star * B_star * r_star * r_star * r_star * r_star * Omega * Omega;  // spin down luminosity-monopole
 
     Bphi_wind = sqrt(3.0 / 2 * L_sd / rin / rin / (1 + 1 / sigma_wind));
+
+    Real L_sd_real = Bphi_wind * Bphi_wind * rin * rin * 4 * PI * 2 / 3;
 
     if (gamma_wind == 0) {
         gamma_wind = sqrt((1 + sigma_wind));
@@ -191,13 +196,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
     rho_wind = Bphi_wind * Bphi_wind / gamma_wind / gamma_wind / sigma_wind;
     // ejecta calculations
-
     r_c = t_d * v_ej;
 
-    // Real v_ej_esc = 0.024 * pow(t_d, -1.0 / 3);  // 0.024c is the escape velocity of t_d = 1sec with M_ns = 1.4Msun
-    // r_ej_in = v_ej_esc * t_d;
-
-    rho_ej = M_ej / (r_c * r_c * 2 * PI * (0.5 + 3 * PI / 8) * (r_c - rin));
+    if (ej_uniform == false) {
+        rho_ej = M_ej / (r_c * r_c * 2 * PI * (0.5 + 3 * PI / 8) * (r_c - rin));
+    } else {
+        rho_ej = M_ej / (4.0 / 3 * PI * (r_c * r_c * r_c - rin * rin * rin));
+    }
     // Real E_ej = 0.5 * rho_ej * v_ej * v_ej * 4 * PI * r_c * r_c * r_c / 3;
     // jet calculations
 
@@ -242,7 +247,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("sigma_wind", sigma_wind, sigma_wind);
 
     print_par("L_jet", L_jet * uE / uT, L_jet);
-    print_par("L_sd", L_sd * uE / uT, L_sd);
+    print_par("L_sd_mono", L_sd * uE / uT, L_sd);
+    print_par("L_sd_real", L_sd_real * uE / uT, L_sd_real);
 
     print_par("B_jet", B_jm * uB, B_jm);
     print_par("B_in_wind", Bphi_wind * uB, Bphi_wind);
@@ -272,7 +278,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
                     Real rho = 0;
                     Real p = p_amb;
                     if (r < r_c) {
-                        rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
+                        if (ej_uniform == false) {
+                            rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
+                        } else {
+                            rho = rho_ej * pow(r / r_c, -2);
+                        }
                         v = v_ej * r / r_c;
                         p = rho * k_ej;
                     } else {
@@ -370,7 +380,11 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                     } else {
                         Real sin_theta = sin(theta);
                         Real r = pcoord->x1v(il - i);
-                        Real rho = rho_ej * (0.25 + sin_theta * sin_theta * sin_theta) * pow(r / r_c, -2);
+                        Real f = 1.0;
+                        if (ej_uniform == false) {
+                            f = (0.25 + sin_theta * sin_theta * sin_theta);
+                        }
+                        Real rho = rho_ej * f * pow(r / r_c, -2);
                         Real v_r = v_ej * r / r_c;
                         prim(IDN, k, j, il - i) = rho;
                         prim(IVX, k, j, il - i) = v_r / sqrt(1 - v_r * v_r);
