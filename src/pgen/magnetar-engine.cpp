@@ -201,7 +201,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     if (ej_uniform == false) {
         rho_ej = M_ej / (r_c * r_c * 2 * PI * (0.5 + 3 * PI / 8) * (r_c - rin));
     } else {
-        rho_ej = M_ej / (4.0 / 3 * PI * (r_c * r_c * r_c - rin * rin * rin));
+        rho_ej = M_ej / (4.0 * PI * r_c * r_c * (r_c - rin));
     }
     // Real E_ej = 0.5 * rho_ej * v_ej * v_ej * 4 * PI * r_c * r_c * r_c / 3;
     // jet calculations
