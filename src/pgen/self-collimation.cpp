@@ -104,8 +104,6 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, Face
 //========================================================================================
 
 Real hydro_coef = 4;
-Real p_amb = 1e-16;
-Real rho_amb = 1.35e-3;
 Real gamma_hydro = 1.33333333333333333;
 Real rin = 1.666666e-3;
 
@@ -115,31 +113,28 @@ Real Br = 0;
 Real B_star = 0;
 Real r_star = 1.2e6 / 3e10;
 Real rho_wind = 0;
-Real k_wind = 1e-5;
+Real p_wind = 1e-5;
+Real rho_amb = 1e-3;
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
     rin = pin->GetOrAddReal("problem", "r_in", 1.6666666666e-3);
     //  reading hydro paramters
     gamma_hydro = pin->GetOrAddReal("hydro", "gamma", 1.33333333);
     hydro_coef = gamma_hydro / (gamma_hydro - 1);
-
-    // reading parameters of ambient medium
-    p_amb = pin->GetOrAddReal("problem", "p_amb", 1e-15);
-    rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1.35e-6);
-
     // reading parameters of wind
     B_star = pin->GetOrAddReal("problem", "B_star", 100);
     Real sigma_wind = pin->GetOrAddReal("problem", "sigma_wind", 1000);
     Real T = pin->GetOrAddReal("problem", "T", 0.001);
-    k_wind = pin->GetOrAddReal("problem", "k_wind", 0.05);
+    Real k_wind = pin->GetOrAddReal("problem", "k_wind", 0.05);
+    rho_amb = pin->GetOrAddReal("problem", "rho_amb", 1e-3);
 
     /// initializing variables
     Omega = 2 * PI / T;
     Real Rlc = 1 / Omega;
-    Real Br = B_star * B_star * r_star * r_star / rin / rin;
+    Real Br = B_star * r_star * r_star / rin / rin;
     rho_wind = Br * Br / sigma_wind;
-
-    std::cout << rho_wind << ' ' << rho_amb << std::endl;
+    p_wind = rho_wind * k_wind;
+    std::cout << Br << ' ' << r_star << ' ' << rin << ' ' << rho_wind << std::endl;
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -149,6 +144,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     //----------------------------------------------------------------------------------------------
+    Real p_amb = rho_amb * 1e-5;
     for (int k = ks; k <= ke; k++) {
         for (int j = js; j <= je; j++) {
             for (int i = is; i <= ie; i++) {
@@ -203,7 +199,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 prim(IVX, k, j, il - i) = 0.0;
                 prim(IVY, k, j, il - i) = 0.0;
                 prim(IVZ, k, j, il - i) = Omega * r * sin(theta);
-                prim(IPR, k, j, il - i) = rho_wind * k_wind;
+                prim(IPR, k, j, il - i) = p_wind;
             }
         }
     }
