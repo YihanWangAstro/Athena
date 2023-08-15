@@ -87,10 +87,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     R_lc = 1 / Omega;
 
     Real Bphi = -B_star * r_star * r_star / rin / R_lc;
-    Real Br = B_star * r_star * r_star / rin / rin;
 
     Real ur = sqrt(gamma_wind * gamma_wind - 1);
-    Real rho = (Bphi * Bphi + Br * Br) / sigma_wind / gamma_wind / gamma_wind;
+    Real rho = (Bphi * Bphi) / (sigma_wind + 1) / gamma_wind / gamma_wind;
     Real p_w = rho * k_wind;
 
     // ejecta calculations
@@ -110,7 +109,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     print_par("sig_wind", sigma_wind, sigma_wind);
     print_par("rho_amb", rho_amb * urho, rho_amb);
     print_par("p_amb", p_amb, p_amb);
-    
 
     if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
         EnrollUserBoundaryFunction(BoundaryFace::inner_x1, LoopInnerX1);
@@ -168,7 +166,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
                 Real r = pcoord->x1v(il - i);
                 Real Bphi = -B_star * r_star * r_star / r / R_lc;
                 Real ur = sqrt(gamma_wind * gamma_wind - 1);
-                Real rho = (Bphi * Bphi) / sigma_wind / gamma_wind / gamma_wind;
+                Real rho = (Bphi * Bphi) / (sigma_wind + 1) / gamma_wind / gamma_wind;
                 prim(IDN, k, j, il - i) = rho;
                 prim(IVX, k, j, il - i) = ur;
                 prim(IVY, k, j, il - i) = 0.0;
@@ -196,7 +194,7 @@ void LoopInnerX1(MeshBlock *pmb, Coordinates *pcoord, AthenaArray<Real> &prim, F
         for (int j = jl; j <= ju; ++j) {
             for (int i = 1; i <= ngh; ++i) {
                 Real r = pcoord->x1f(il - i);
-                b.x3f(k, j, (il - i)) = -B_star * r_star * r_star / r / R_lc;
+                b.x3f(k, j, (il - i)) = -B_star * r_star * r_star / r / R_lc * sigma_wind / (1 + sigma_wind);
             }
         }
     }
